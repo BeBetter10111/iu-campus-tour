@@ -35,11 +35,11 @@ TEXTURE_DIR = ASSET_DIR / "textures"
 MODEL_DIR = ASSET_DIR / "models"
 SKYBOX_DIR = ASSET_DIR / "skybox"
 
-
-SUN_AZIMUTH = 160.0     # Mặt trời bên trái, hơi lệch về phía tòa nhà
-SUN_ELEVATION = 35.0    # Thấp hơn -> bóng dài, dễ nhìn thấy hơn
+SUN_COLOR = (1.0, 0.95, 0.8)  # Màu vàng nhạt
+SUN_AZIMUTH = 140.0     # Mặt trời bên trái, hơi lệch về phía tòa nhà
+SUN_ELEVATION = 45.0    # Thấp hơn -> bóng dài, dễ nhìn thấy hơn
 SUN_INTENSITY = 1.0
-AMBIENT_COLOR = (0.25, 0.28, 0.35)
+AMBIENT_COLOR = (0.22, 0.26, 0.34)
 
 # --- Shadow mapping ---
 SHADOW_MAP_SIZE = 2048
