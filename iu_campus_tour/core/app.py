@@ -1,5 +1,3 @@
-"""App: vòng lặp game chính (game loop) và xử lý sự kiện."""
-
 import pygame
 from OpenGL.GL import (
     glClearColor, glClear, glEnable,
@@ -8,69 +6,79 @@ from OpenGL.GL import (
 
 import config
 from core.window import Window
+from core.timer import Timer
+from graphics.shader import Shader
+from graphics.mesh import create_cube
+from graphics import math3d as m3d
+from scene.camera import FirstPersonCamera
 
 
 class App:
-    """Điều phối: input -> update(dt) -> render -> swap.
-
-    Delta time (dt) được tính ngay từ đầu để mọi chuyển động sau này
-    (camera, animation) đều độc lập với FPS:  vị_trí += vận_tốc * dt
-    """
-
     def __init__(self):
         self.window = Window()
-        self.clock = pygame.time.Clock()
+        self.timer = Timer()
         self.running = True
 
-        # Trạng thái GL toàn cục
-        glEnable(GL_DEPTH_TEST)   # Z-buffer: pixel gần camera che pixel xa
-        glEnable(GL_CULL_FACE)    # Bỏ mặt sau của tam giác -> giảm ~50% fragment
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_CULL_FACE)
         glClearColor(*config.CLEAR_COLOR)
 
-        self._fps_timer = 0.0
-        self._frames = 0
+        self.shader = Shader.from_files("basic.vert", "basic.frag")
+        self.cube = create_cube()
+        self.camera = FirstPersonCamera()
+        self._build_test_scene()
 
-    # ------------------------------------------------------------------ loop
+        self.mouse_captured = False
+        self._set_mouse_capture(True)
+
+    def _build_test_scene(self):
+        self.models = [m3d.translate(0, -0.1, 0) @ m3d.scale(60, 0.2, 60)]  
+        for x in range(-8, 9, 4):
+            for z in range(-16, 1, 4):
+                self.models.append(m3d.translate(x, 0.5, z))
+
+    def _set_mouse_capture(self, enabled):
+        self.mouse_captured = enabled
+        pygame.event.set_grab(enabled)
+        pygame.mouse.set_visible(not enabled)
+        pygame.mouse.get_rel()   
+
     def run(self):
         while self.running:
-            # tick() trả về mili-giây kể từ lần gọi trước -> đổi sang giây
-            dt = self.clock.tick(config.FPS_CAP) / 1000.0
-
+            dt = self.timer.tick()
             self._handle_events()
             self._update(dt)
             self._render()
             self.window.swap()
-            self._update_fps(dt)
-
+            if self.timer.fps_updated:
+                self.window.set_title(f"{config.WINDOW_TITLE} | {self.timer.fps:.0f} FPS")
         self.window.close()
 
-    # ---------------------------------------------------------------- events
     def _handle_events(self):
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
                 self.running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                self.running = False
-            elif event.type == pygame.VIDEORESIZE:
-                self.window.resize(event.w, event.h)
+            elif e.type == pygame.KEYDOWN:
+                if e.key == pygame.K_ESCAPE:
+                    self.running = False
+                elif e.key == pygame.K_TAB:                
+                    self._set_mouse_capture(not self.mouse_captured)
+                elif e.key == pygame.K_f:                 
+                    self.camera.fly_mode = not self.camera.fly_mode
+            elif e.type == pygame.VIDEORESIZE:
+                self.window.resize(e.w, e.h)
 
-    # ---------------------------------------------------------------- update
     def _update(self, dt):
-        """Cập nhật logic theo thời gian thực (camera, animation...) - Phase 2+."""
-        pass
+        if self.mouse_captured:
+            dx, dy = pygame.mouse.get_rel()
+            self.camera.process_mouse(dx, dy)
+        self.camera.process_keyboard(pygame.key.get_pressed(), dt)
 
-    # ---------------------------------------------------------------- render
     def _render(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        # Vẽ scene ở đây (Phase 1 tiếp theo: shader + cube)
-
-    # ------------------------------------------------------------------- fps
-    def _update_fps(self, dt):
-        """Hiển thị FPS trung bình trên tiêu đề, cập nhật mỗi 0.5 giây."""
-        self._fps_timer += dt
-        self._frames += 1
-        if self._fps_timer >= config.FPS_TITLE_INTERVAL:
-            fps = self._frames / self._fps_timer
-            self.window.set_title(f"{config.WINDOW_TITLE} | {fps:.0f} FPS")
-            self._fps_timer = 0.0
-            self._frames = 0
+        self.shader.use()
+        self.shader.set_mat4("uView", self.camera.get_view_matrix())
+        self.shader.set_mat4("uProjection", self.camera.get_projection_matrix(self.window.aspect))
+        for model in self.models:
+            self.shader.set_mat4("uModel", model)
+            self.cube.draw()
