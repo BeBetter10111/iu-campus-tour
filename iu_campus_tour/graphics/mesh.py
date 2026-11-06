@@ -10,9 +10,12 @@ from OpenGL.GL import (
 
 class Mesh:
     def __init__(self, vertices, indices):
-        vertices = np.ascontiguousarray(vertices, dtype=np.float32)
+        vertices = np.ascontiguousarray(vertices, dtype=np.float32).reshape(-1, 8)
         indices = np.ascontiguousarray(indices, dtype=np.uint32)
         self.index_count = len(indices)
+
+        self.bounds_min = vertices[:, :3].min(axis=0)
+        self.bounds_max = vertices[:, :3].max(axis=0)
 
         self.vao = glGenVertexArrays(1)
         glBindVertexArray(self.vao)
@@ -21,7 +24,7 @@ class Mesh:
         glBindBuffer(GL_ARRAY_BUFFER, vbo)
         glBufferData(GL_ARRAY_BUFFER, vertices.nbytes, vertices, GL_STATIC_DRAW)
 
-        ebo = glGenBuffers(1)  
+        ebo = glGenBuffers(1)   
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo)
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.nbytes, indices, GL_STATIC_DRAW)
 
@@ -37,22 +40,32 @@ class Mesh:
         glDrawElements(GL_TRIANGLES, self.index_count, GL_UNSIGNED_INT, None)
 
 
-def create_cube():
-    faces = [
-        ((1, 0, 0), (0, 0, -1), (0, 1, 0)),   # +X
-        ((-1, 0, 0), (0, 0, 1), (0, 1, 0)),   # -X
-        ((0, 1, 0), (1, 0, 0), (0, 0, -1)),   # +Y
-        ((0, -1, 0), (1, 0, 0), (0, 0, 1)),   # -Y
-        ((0, 0, 1), (1, 0, 0), (0, 1, 0)),    # +Z
-        ((0, 0, -1), (-1, 0, 0), (0, 1, 0)),  # -Z
-    ]
+_BOX_FACES = [
+    ((1, 0, 0), (0, 0, -1), (0, 1, 0)),   # +X
+    ((-1, 0, 0), (0, 0, 1), (0, 1, 0)),   # -X
+    ((0, 1, 0), (1, 0, 0), (0, 0, -1)),   # +Y
+    ((0, -1, 0), (1, 0, 0), (0, 0, 1)),   # -Y
+    ((0, 0, 1), (1, 0, 0), (0, 1, 0)),    # +Z
+    ((0, 0, -1), (-1, 0, 0), (0, 1, 0)),  # -Z
+]
+
+
+def create_box(size=(1.0, 1.0, 1.0), tex_size=1.0):
+    size = np.asarray(size, dtype=np.float32)
+    corners = ((-1, -1), (1, -1), (1, 1), (-1, 1))
+    uvs = ((0, 0), (1, 0), (1, 1), (0, 1))
+
     verts, idx = [], []
-    for i, (n, t, b) in enumerate(faces):
-        n, t, b = map(np.array, (n, t, b))
-        for (st, sb), uv in zip(((-1, -1), (1, -1), (1, 1), (-1, 1)),
-                                ((0, 0), (1, 0), (1, 1), (0, 1))):
-            pos = 0.5 * (n + st * t + sb * b)
-            verts.append([*pos, *n, *uv])
+    for i, (n, t, b) in enumerate(_BOX_FACES):
+        n, t, b = (np.array(v, dtype=np.float32) for v in (n, t, b))
+        ext_t, ext_b = abs(size @ t), abs(size @ b)
+        for (st, sb), (u, v) in zip(corners, uvs):
+            pos = 0.5 * size * (n + st * t + sb * b)
+            verts.append([*pos, *n, u * ext_t / tex_size, v * ext_b / tex_size])
         base = i * 4
         idx += [base, base + 1, base + 2, base, base + 2, base + 3]
     return Mesh(np.array(verts, dtype=np.float32), np.array(idx, dtype=np.uint32))
+
+
+def create_cube():
+    return create_box()

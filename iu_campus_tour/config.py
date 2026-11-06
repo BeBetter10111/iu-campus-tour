@@ -24,3 +24,10 @@ EYE_HEIGHT = 1.7
 WALK_SPEED = 4.0      # m/s
 RUN_SPEED = 8.0       # m/s 
 MOUSE_SENSITIVITY = 0.1  
+
+#Đường dẫn assets 
+from pathlib import Path
+ASSET_DIR = Path(__file__).resolve().parent / "assets"
+TEXTURE_DIR = ASSET_DIR / "textures"
+MODEL_DIR = ASSET_DIR / "models"
+SKYBOX_DIR = ASSET_DIR / "skybox"

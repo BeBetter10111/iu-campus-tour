@@ -1,5 +1,3 @@
-"""Điểm vào của chương trình: python main.py"""
-
 import config
 
 import OpenGL
