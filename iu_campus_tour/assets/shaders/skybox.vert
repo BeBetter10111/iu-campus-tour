@@ -1,7 +1,7 @@
 #version 330 core
 layout(location = 0) in vec3 aPos;
 
-uniform mat4 uView;         // View đã BỎ phần tịnh tiến (chỉ giữ xoay)
+uniform mat4 uView;         
 uniform mat4 uProjection;
 
 out vec3 vDir;

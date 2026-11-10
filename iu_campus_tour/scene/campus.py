@@ -24,15 +24,16 @@ def build_campus():
     scene.add(SceneObject(ground, ground_tex, position=(0, -0.1, 0)))
 
     buildings = [
-        ((40, 14, 16), (0, -40), wall_a),    
-        ((16, 22, 16), (-35, -15), wall_b),  
-        ((16, 22, 16), (35, -15), wall_b),   
-        ((24, 10, 12), (30, 30), wall_a),    
+        ((40, 14, 16), (0, -40), wall_a),    # Tòa chính, đối diện điểm xuất phát
+        ((16, 22, 16), (-35, -15), wall_b),  # Tòa trái
+        ((16, 22, 16), (35, -15), wall_b),   # Tòa phải
+        ((24, 10, 12), (30, 30), wall_a),    # Tòa phụ
     ]
     for size, (x, z), tex in buildings:
         mesh = create_box(size, tex_size=4.0)
         scene.add(SceneObject(mesh, tex, position=(x, size[1] / 2, z)))
 
+    # Test OBJ loader: nếu có file assets/models/test.obj thì đặt thêm vào cảnh
     obj_path = config.MODEL_DIR / "test.obj"
     if obj_path.exists():
         scene.add(SceneObject(load_obj(obj_path), wall_b,

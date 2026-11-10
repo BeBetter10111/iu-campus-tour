@@ -68,7 +68,7 @@ class Cubemap:
         glBindTexture(GL_TEXTURE_CUBE_MAP, self.id)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         for i, face in enumerate(faces):
-            face = np.ascontiguousarray(face, dtypezzzzzzzzzzz=np.uint8)
+            face = np.ascontiguousarray(face, dtype=np.uint8)
             h, w = face.shape[:2]
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, w, h, 0,
                          GL_RGB, GL_UNSIGNED_BYTE, face)

@@ -2,7 +2,7 @@
 in vec3 vNormal;
 in vec2 vUV;
 
-uniform sampler2D uTexture;   // Gắn với texture unit 0
+uniform sampler2D uTexture;   
 out vec4 FragColor;
 
 void main() {

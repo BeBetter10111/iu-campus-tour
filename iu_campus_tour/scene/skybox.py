@@ -17,7 +17,7 @@ class Skybox:
         view_rot = view.copy()
         view_rot[:3, 3] = 0.0
 
-        glDepthFunc(GL_LEQUAL)      
+        glDepthFunc(GL_LEQUAL)     
         glDisable(GL_CULL_FACE)     
         self.shader.use()
         self.shader.set_mat4("uView", view_rot)

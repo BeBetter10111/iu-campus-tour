@@ -8,9 +8,9 @@ import config
 from core.window import Window
 from core.timer import Timer
 from graphics.shader import Shader
-from graphics.mesh import create_cube
-from graphics import math3d as m3d
 from scene.camera import FirstPersonCamera
+from scene.campus import build_campus
+from scene.skybox import Skybox
 
 
 class App:
@@ -23,25 +23,19 @@ class App:
         glEnable(GL_CULL_FACE)
         glClearColor(*config.CLEAR_COLOR)
 
-        self.shader = Shader.from_files("basic.vert", "basic.frag")
-        self.cube = create_cube()
-        self.camera = FirstPersonCamera()
-        self._build_test_scene()
+        self.shader = Shader.from_files("texture.vert", "texture.frag")
+        self.scene = build_campus()
+        self.skybox = Skybox()
+        self.camera = FirstPersonCamera(position=(0.0, config.EYE_HEIGHT, 15.0))
 
         self.mouse_captured = False
         self._set_mouse_capture(True)
-
-    def _build_test_scene(self):
-        self.models = [m3d.translate(0, -0.1, 0) @ m3d.scale(60, 0.2, 60)]  
-        for x in range(-8, 9, 4):
-            for z in range(-16, 1, 4):
-                self.models.append(m3d.translate(x, 0.5, z))
 
     def _set_mouse_capture(self, enabled):
         self.mouse_captured = enabled
         pygame.event.set_grab(enabled)
         pygame.mouse.set_visible(not enabled)
-        pygame.mouse.get_rel()   
+        pygame.mouse.get_rel()
 
     def run(self):
         while self.running:
@@ -61,9 +55,9 @@ class App:
             elif e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_ESCAPE:
                     self.running = False
-                elif e.key == pygame.K_TAB:                
+                elif e.key == pygame.K_TAB:
                     self._set_mouse_capture(not self.mouse_captured)
-                elif e.key == pygame.K_f:                 
+                elif e.key == pygame.K_f:
                     self.camera.fly_mode = not self.camera.fly_mode
             elif e.type == pygame.VIDEORESIZE:
                 self.window.resize(e.w, e.h)
@@ -76,9 +70,12 @@ class App:
 
     def _render(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        view = self.camera.get_view_matrix()
+        proj = self.camera.get_projection_matrix(self.window.aspect)
+
         self.shader.use()
-        self.shader.set_mat4("uView", self.camera.get_view_matrix())
-        self.shader.set_mat4("uProjection", self.camera.get_projection_matrix(self.window.aspect))
-        for model in self.models:
-            self.shader.set_mat4("uModel", model)
-            self.cube.draw()
+        self.shader.set_mat4("uView", view)
+        self.shader.set_mat4("uProjection", proj)
+        self.scene.draw(self.shader)
+
+        self.skybox.draw(view, proj)
