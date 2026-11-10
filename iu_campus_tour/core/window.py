@@ -1,5 +1,3 @@
-"""Window: tạo cửa sổ pygame với OpenGL 3.3 Core Profile."""
-
 import pygame
 from OpenGL.GL import (
     glGetString, glViewport,
@@ -10,22 +8,15 @@ import config
 
 
 class Window:
-    """Bao bọc pygame display + OpenGL context.
-
-    Trách nhiệm duy nhất: khởi tạo context, đổi kích thước, hoán đổi buffer.
-    Không chứa logic game -> dễ tái sử dụng và dễ test.
-    """
-
     def __init__(self, width=config.WINDOW_WIDTH, height=config.WINDOW_HEIGHT):
         pygame.init()
 
-        # Phải đặt thuộc tính GL TRƯỚC khi gọi set_mode.
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MAJOR_VERSION, config.GL_MAJOR)
         pygame.display.gl_set_attribute(pygame.GL_CONTEXT_MINOR_VERSION, config.GL_MINOR)
         pygame.display.gl_set_attribute(
             pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE
         )
-        pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)  # Depth buffer 24-bit
+        pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)  
 
         if config.MSAA_SAMPLES > 0:
             pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1)
@@ -43,16 +34,13 @@ class Window:
 
     @property
     def aspect(self):
-        """Tỉ lệ khung hình = width / height (dùng cho ma trận Perspective ở Phase 2)."""
         return self.width / max(self.height, 1)
 
     def resize(self, width, height):
-        """Cập nhật viewport khi người dùng kéo giãn cửa sổ."""
         self.width, self.height = width, height
         glViewport(0, 0, width, height)
 
     def swap(self):
-        """Hoán đổi back buffer <-> front buffer (double buffering)."""
         pygame.display.flip()
 
     def set_title(self, title):

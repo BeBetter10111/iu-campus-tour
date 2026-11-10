@@ -25,9 +25,23 @@ WALK_SPEED = 4.0      # m/s
 RUN_SPEED = 8.0       # m/s 
 MOUSE_SENSITIVITY = 0.1  
 
-#Đường dẫn assets 
+# Assets 
 from pathlib import Path
 ASSET_DIR = Path(__file__).resolve().parent / "assets"
 TEXTURE_DIR = ASSET_DIR / "textures"
 MODEL_DIR = ASSET_DIR / "models"
 SKYBOX_DIR = ASSET_DIR / "skybox"
+
+# Lighting
+SUN_AZIMUTH = 120.0     
+SUN_ELEVATION = 40.0   
+SUN_COLOR = (1.0, 0.95, 0.85)
+SUN_INTENSITY = 0.85
+AMBIENT_COLOR = (0.30, 0.33, 0.40)   
+
+# Shadow mapping
+SHADOW_MAP_SIZE = 2048
+SHADOW_RADIUS = 80.0        
+SHADOW_DISTANCE = 150.0     
+SHADOW_BIAS = 0.0002        
+SHADOW_NORMAL_OFFSET = 1.0  

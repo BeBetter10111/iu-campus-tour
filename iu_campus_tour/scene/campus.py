@@ -33,7 +33,6 @@ def build_campus():
         mesh = create_box(size, tex_size=4.0)
         scene.add(SceneObject(mesh, tex, position=(x, size[1] / 2, z)))
 
-    # Test OBJ loader: nếu có file assets/models/test.obj thì đặt thêm vào cảnh
     obj_path = config.MODEL_DIR / "test.obj"
     if obj_path.exists():
         scene.add(SceneObject(load_obj(obj_path), wall_b,
