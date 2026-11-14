@@ -87,11 +87,9 @@ class App:
             dx, dy = pygame.mouse.get_rel()
             self.camera.process_mouse(dx, dy)
         self.camera.process_keyboard(pygame.key.get_pressed(), dt)
-        # Dời khung shadow map theo người chơi (có snapping). Vật thể tĩnh nên chỉ cần
-        # render lại shadow map khi khung dịch chuyển, đứng yên thì tiết kiệm cả 1 pass.
         self._shadow_dirty |= self.light.update(self.camera.position)
 
-    # ------------------------------------------------------------------ render
+    # render
     def _render_shadow_pass(self):
         self.shadow_map.begin()
         self.depth_shader.use()
@@ -100,12 +98,10 @@ class App:
         self.shadow_map.end(self.window.width, self.window.height)
 
     def _render(self):
-        # ---- PASS 1: depth map từ góc nhìn mặt trời ----
         if self.shadows_on and self._shadow_dirty:
             self._render_shadow_pass()
             self._shadow_dirty = False
 
-        # ---- PASS 2: cảnh chính ----
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         view = self.camera.get_view_matrix()
         proj = self.camera.get_projection_matrix(self.window.aspect)
@@ -129,4 +125,4 @@ class App:
         self.shadow_map.bind(1)          # Depth map ở texture unit 1 (unit 0 dành cho albedo)
 
         self.scene.draw(s)
-        self.skybox.draw(view, proj)     # Skybox vẫn vẽ cuối cùng
+        self.skybox.draw(view, proj, self.light.direction, self.light.color)

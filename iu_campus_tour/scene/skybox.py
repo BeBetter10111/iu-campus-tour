@@ -1,3 +1,5 @@
+"""Skybox: cube bao quanh, luôn ở xa vô cực và đi theo camera."""
+
 from OpenGL.GL import (glDepthFunc, glDisable, glEnable,
                        GL_LEQUAL, GL_LESS, GL_CULL_FACE)
 
@@ -13,16 +15,18 @@ class Skybox:
         self.cube = create_box()
         self.cubemap = Cubemap.load_or_procedural(config.SKYBOX_DIR)
 
-    def draw(self, view, projection):
+    def draw(self, view, projection, sun_dir, sun_color):
         view_rot = view.copy()
         view_rot[:3, 3] = 0.0
 
-        glDepthFunc(GL_LEQUAL)     
+        glDepthFunc(GL_LEQUAL)      
         glDisable(GL_CULL_FACE)     
         self.shader.use()
         self.shader.set_mat4("uView", view_rot)
         self.shader.set_mat4("uProjection", projection)
         self.shader.set_int("uSkybox", 0)
+        self.shader.set_vec3("uSunDir", *sun_dir)
+        self.shader.set_vec3("uSunColor", *sun_color)
         self.cubemap.bind(0)
         self.cube.draw()
         glEnable(GL_CULL_FACE)

@@ -32,11 +32,21 @@ class Shader:
 
     @staticmethod
     def _compile(kind, source):
+        source = source.encode("ascii", "ignore").decode("ascii")
+
         sh = glCreateShader(kind)
         glShaderSource(sh, source)
         glCompileShader(sh)
         if not glGetShaderiv(sh, GL_COMPILE_STATUS):
-            raise RuntimeError("Shader compile error:\n" + glGetShaderInfoLog(sh).decode())
+            log = glGetShaderInfoLog(sh).decode(errors="ignore")
+            lines = source.splitlines()
+            context = ""
+            for num in re.findall(r"\d+:(\d+)", log):
+                n = int(num)
+                if 1 <= n <= len(lines):
+                    context += f"\n  dòng {n}: {lines[n - 1].strip()}"
+            kind_name = "VERTEX" if kind == GL_VERTEX_SHADER else "FRAGMENT"
+            raise RuntimeError(f"{kind_name} shader compile error:\n{log}{context}")
         return sh
 
     def use(self):
