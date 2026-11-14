@@ -2,7 +2,6 @@ import numpy as np
 
 F32 = np.float32
 
-
 def normalize(v):
     v = np.asarray(v, dtype=F32)
     n = np.linalg.norm(v)
@@ -75,4 +74,14 @@ def perspective(fov_y_deg, aspect, near, far):
     m[2, 2] = (far + near) / (near - far)
     m[2, 3] = 2.0 * far * near / (near - far)
     m[3, 2] = -1.0
+    return m
+
+def orthographic(left, right, bottom, top, near, far):
+    m = np.identity(4, dtype=F32)
+    m[0, 0] = 2.0 / (right - left)
+    m[1, 1] = 2.0 / (top - bottom)
+    m[2, 2] = -2.0 / (far - near)
+    m[0, 3] = -(right + left) / (right - left)
+    m[1, 3] = -(top + bottom) / (top - bottom)
+    m[2, 3] = -(far + near) / (far - near)
     return m

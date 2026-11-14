@@ -21,17 +21,17 @@ def build_campus():
     wall_b = _texture("wall_b.jpg", (190, 110, 90), (165, 90, 70))
 
     ground = create_box((300, 0.2, 300), tex_size=6.0)
-    scene.add(SceneObject(ground, ground_tex, position=(0, -0.1, 0)))
+    scene.add(SceneObject(ground, ground_tex, position=(0, -0.1, 0), specular=0.02, shininess=8.0, cast_shadow=False))
 
     buildings = [
-        ((40, 14, 16), (0, -40), wall_a),    # Tòa chính, đối diện điểm xuất phát
-        ((16, 22, 16), (-35, -15), wall_b),  # Tòa trái
-        ((16, 22, 16), (35, -15), wall_b),   # Tòa phải
-        ((24, 10, 12), (30, 30), wall_a),    # Tòa phụ
+        ((40, 14, 16), (0, -40), wall_a),   
+        ((16, 22, 16), (-35, -15), wall_b),  
+        ((16, 22, 16), (35, -15), wall_b),  
+        ((24, 10, 12), (30, 30), wall_a),    
     ]
     for size, (x, z), tex in buildings:
         mesh = create_box(size, tex_size=4.0)
-        scene.add(SceneObject(mesh, tex, position=(x, size[1] / 2, z)))
+        scene.add(SceneObject(mesh, tex, position=(x, size[1] / 2, z), specular=0.15, shininess=8.0, cast_shadow=False))
 
     obj_path = config.MODEL_DIR / "test.obj"
     if obj_path.exists():

@@ -3,7 +3,7 @@ import numpy as np
 from OpenGL.GL import (
     glCreateShader, glShaderSource, glCompileShader, glGetShaderiv, glGetShaderInfoLog,
     glCreateProgram, glAttachShader, glLinkProgram, glGetProgramiv, glGetProgramInfoLog,
-    glDeleteShader, glUseProgram, glGetUniformLocation,
+    glDeleteShader, glUniformMatrix3fv, glUseProgram, glGetUniformLocation,
     glUniformMatrix4fv, glUniform3f, glUniform1f, glUniform1i,
     GL_VERTEX_SHADER, GL_FRAGMENT_SHADER, GL_COMPILE_STATUS, GL_LINK_STATUS, GL_TRUE,
 )
@@ -49,6 +49,9 @@ class Shader:
 
     def set_mat4(self, name, m):
         glUniformMatrix4fv(self._loc(name), 1, GL_TRUE, np.ascontiguousarray(m, dtype=np.float32))
+
+    def set_mat3(self, name, m):
+        glUniformMatrix3fv(self._loc(name), 1, GL_TRUE, np.ascontiguousarray(m, dtype=np.float32))
 
     def set_vec3(self, name, x, y, z): glUniform3f(self._loc(name), x, y, z)
     def set_float(self, name, v): glUniform1f(self._loc(name), v)

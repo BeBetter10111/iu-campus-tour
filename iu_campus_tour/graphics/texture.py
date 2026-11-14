@@ -28,7 +28,7 @@ class Texture:
         glGenerateMipmap(GL_TEXTURE_2D)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)  
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)  # UV > 1 thì lặp lại
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)  
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
 
         try:
@@ -95,14 +95,14 @@ class Cubemap:
                    horizon=(0.75, 0.88, 0.97), ground=(0.45, 0.42, 0.38)):
         zen, hor, gnd = (np.array(c, dtype=np.float32) for c in (zenith, horizon, ground))
         rows = np.arange(size, dtype=np.float32)
-        e = (0.5 - (rows + 0.5) / size) * 2.0            # hàng 0 (trên cùng) -> e ≈ +1
+        e = (0.5 - (rows + 0.5) / size) * 2.0           
         up, down = np.clip(e, 0, 1)[:, None], np.clip(-e, 0, 1)[:, None]
-        col = hor + (zen - hor) * up                     # chân trời -> đỉnh trời
-        col = col + (gnd - col) * down                   # chân trời -> mặt đất
-        side = np.repeat(col[:, None, :], size, axis=1)  # (size, size, 3)
+        col = hor + (zen - hor) * up                     
+        col = col + (gnd - col) * down                   
+        side = np.repeat(col[:, None, :], size, axis=1)  
         top = np.broadcast_to(zen, (size, size, 3))
         bottom = np.broadcast_to(gnd, (size, size, 3))
-        faces = [side, side, top, bottom, side, side]    # right,left,top,bottom,front,back
+        faces = [side, side, top, bottom, side, side]    
         return cls([(f * 255).astype(np.uint8) for f in faces])
 
     def bind(self, unit=0):

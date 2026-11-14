@@ -3,12 +3,19 @@ from graphics import math3d as m3d
 
 
 class SceneObject:
-    def __init__(self, mesh, texture, position=(0, 0, 0), rotation_y=0.0, scale=(1, 1, 1)):
+    def __init__(self, mesh, texture, position=(0, 0, 0), rotation_y=0.0, scale=(1, 1, 1),
+                 specular=0.1, shininess=32.0, cast_shadow=True):
         self.mesh = mesh
         self.texture = texture
+        self.specular = specular        
+        self.shininess = shininess      
+        self.cast_shadow = cast_shadow  
+
+        # Model = T · R · S
         self.model = (m3d.translate(*position)
                       @ m3d.rotate_y(np.radians(rotation_y))
                       @ m3d.scale(*scale))
+        self.normal_matrix = np.linalg.inv(self.model[:3, :3]).T.astype(np.float32)
         self._compute_world_aabb()
 
     def _compute_world_aabb(self):
@@ -28,15 +35,24 @@ class Scene:
 
     def add(self, obj):
         self.objects.append(obj)
-        self.objects.sort(key=lambda o: id(o.texture))
+        self.objects.sort(key=lambda o: id(o.texture))   
         return obj
 
     def draw(self, shader):
         shader.set_int("uTexture", 0)
         last_texture = None
         for obj in self.objects:
-            if obj.texture is not last_texture:   
+            if obj.texture is not last_texture:
                 obj.texture.bind(0)
                 last_texture = obj.texture
             shader.set_mat4("uModel", obj.model)
+            shader.set_mat3("uNormalMatrix", obj.normal_matrix)
+            shader.set_float("uSpecular", obj.specular)
+            shader.set_float("uShininess", obj.shininess)
             obj.mesh.draw()
+
+    def draw_depth(self, shader):
+        for obj in self.objects:
+            if obj.cast_shadow:
+                shader.set_mat4("uModel", obj.model)
+                obj.mesh.draw()
