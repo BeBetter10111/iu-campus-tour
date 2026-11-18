@@ -52,6 +52,8 @@ class App:
 
         # Thế giới
         self.scene = build_campus()
+        self.SPAWN_POS = getattr(self.scene, "spawn_pos", self.SPAWN_POS)
+        self.SPAWN_YAW = getattr(self.scene, "spawn_yaw", self.SPAWN_YAW)        
         self.skybox = Skybox()
         self.camera = FirstPersonCamera(position=self.SPAWN_POS, yaw=self.SPAWN_YAW)
         self.collision = CollisionWorld(self.scene.objects)
@@ -117,7 +119,7 @@ class App:
         pygame.mouse.set_visible(not enabled)
         pygame.mouse.get_rel()               # Xả delta tích lũy để khung đầu không bị giật
 
-    # ------------------------------------------------------------------- vòng lặp
+    # vòng lặp
     def run(self):
         while self.running:
             dt = self.timer.tick()
@@ -130,7 +132,7 @@ class App:
                     f"{config.WINDOW_TITLE} | {self.mode.name} | {self.timer.fps:.0f} FPS")
         self.window.close()
 
-    # -------------------------------------------------------------------- sự kiện
+    # sự kiện
     def _handle_events(self):
         for e in pygame.event.get():
             if e.type == pygame.QUIT:

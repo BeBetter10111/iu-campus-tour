@@ -1,0 +1,58 @@
+{
+  "by_name": {
+    "A1": {
+      "levels": 7,
+      "facade": "white",
+      "note": "7 tang theo thong tin ban cung cap. Mat nao do dom (maroon) chua biet -> can facade_by_side."
+    },
+    "A2": {
+      "levels": 7,
+      "facade": "white",
+      "note": "7 tang theo thong tin ban cung cap. Mat nao do dom (maroon) chua biet -> can facade_by_side."
+    },
+    "Laboratory": {
+      "levels": null,
+      "facade": "plain",
+      "note": "CAN XAC NHAN so tang (hien dung mac dinh 2)."
+    }
+  },
+
+  "by_id": {
+    "way/1216806172": {
+      "levels": null,
+      "facade": "concrete",
+      "note": "Toa nha hanh chinh IU, OSM danh dau building=construction. CAN XAC NHAN: da xay xong chua, may tang? Neu xong: doi facade thanh white va dat levels."
+    },
+    "way/1419105580": {
+      "height": 4.5,
+      "facade": "plain",
+      "note": "building=greenhouse (nha kinh, 1119 m2). Do cao 4.5 m la UOC LUONG, CAN XAC NHAN."
+    },
+    "way/259209295": {
+      "levels": null,
+      "facade": "plain",
+      "note": "CAN XAC NHAN: dien tich 1213 m2 va 5 dinh, co the la can-tin IU (suy doan theo dien tich tu anh OSM truoc do)."
+    },
+
+    "way/717915808": {
+      "skip": false,
+      "note": "Nha Van hoa Sinh vien (OSM: 6 tang). Co the nam NGOAI khuon vien IU -> neu dung, doi skip thanh true."
+    },
+    "way/290484111": {
+      "skip": false,
+      "note": "Nha H1. Chua ro thuoc IU hay khu ben canh -> CAN XAC NHAN."
+    },
+    "way/290482143": {
+      "skip": false,
+      "note": "Nha H2 (OSM: 8 tang). Chua ro thuoc IU hay khu ben canh -> CAN XAC NHAN."
+    },
+    "way/290242864": {
+      "skip": false,
+      "note": "Nha dieu hanh (building: office). Chua ro thuoc IU hay khu ben canh -> CAN XAC NHAN."
+    },
+    "way/290326857": {
+      "skip": false,
+      "note": "BK English. Ten khong giong toa cua IU -> co the nam ngoai khuon vien, CAN XAC NHAN."
+    }
+  }
+}
