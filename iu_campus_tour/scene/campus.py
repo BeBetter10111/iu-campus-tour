@@ -21,7 +21,8 @@ def build_campus():
     wall_b = _texture("wall_b.jpg", (190, 110, 90), (165, 90, 70))
 
     ground = create_box((300, 0.2, 300), tex_size=6.0)
-    scene.add(SceneObject(ground, ground_tex, position=(0, -0.1, 0), specular=0.02, shininess=8.0, cast_shadow=False))
+    scene.add(SceneObject(ground, ground_tex, position=(0, -0.1, 0), specular=0.02,
+                          shininess=8.0, cast_shadow=False, collidable=False))
 
     buildings = [
         ((40, 14, 16), (0, -40), wall_a),   

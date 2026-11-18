@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import numpy as np
 from OpenGL.GL import (
     glCreateShader, glShaderSource, glCompileShader, glGetShaderiv, glGetShaderInfoLog,

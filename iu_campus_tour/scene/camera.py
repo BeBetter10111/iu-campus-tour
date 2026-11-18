@@ -55,3 +55,29 @@ class FirstPersonCamera:
 
     def get_projection_matrix(self, aspect):
         return m3d.perspective(config.FOV, aspect, config.NEAR_PLANE, config.FAR_PLANE)
+
+    def get_move_delta(self, keys, dt):
+        speed = config.RUN_SPEED if keys[pygame.K_LSHIFT] else config.WALK_SPEED
+        forward = self.front if self.fly_mode else m3d.normalize([self.front[0], 0.0, self.front[2]])
+        move = np.zeros(3, dtype=np.float32)
+        if keys[pygame.K_w]:
+            move += forward
+        if keys[pygame.K_s]:
+            move -= forward
+        if keys[pygame.K_d]:
+            move += self.right
+        if keys[pygame.K_a]:
+            move -= self.right
+        if self.fly_mode:
+            if keys[pygame.K_e]:
+                move[1] += 1.0
+            if keys[pygame.K_q]:
+                move[1] -= 1.0
+        length = np.linalg.norm(move)
+        return move / length * speed * dt if length > 0 else move
+
+    def set_front(self, direction):
+        d = m3d.normalize(direction)
+        self.pitch = np.degrees(np.arcsin(d[1]))
+        self.yaw = np.degrees(np.arctan2(d[2], d[0]))
+        self._update_vectors()

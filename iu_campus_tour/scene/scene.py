@@ -4,12 +4,13 @@ from graphics import math3d as m3d
 
 class SceneObject:
     def __init__(self, mesh, texture, position=(0, 0, 0), rotation_y=0.0, scale=(1, 1, 1),
-                 specular=0.1, shininess=32.0, cast_shadow=True):
+                 specular=0.1, shininess=32.0, cast_shadow=True, collidable=True):
         self.mesh = mesh
         self.texture = texture
         self.specular = specular        
         self.shininess = shininess      
         self.cast_shadow = cast_shadow  
+        self.collidable = collidable
 
         # Model = T · R · S
         self.model = (m3d.translate(*position)
