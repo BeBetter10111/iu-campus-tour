@@ -36,6 +36,7 @@ def _window(d, cx, cy, w, h, glass=GLASS, frame=FRAME, surround=None, surround_p
 def _make(kind):
     W, H = _px(TILE_W), _px(FLOOR_H)
     if kind == "maroon":                    
+        img = Image.new("RGB", (W, H), MAROON)
         d = ImageDraw.Draw(img)
         for i in range(3):
             _window(d, (i + 0.5) * FLOOR_H, FLOOR_H * 0.52, 1.5, 1.4, surround=WHITE)
@@ -52,6 +53,7 @@ def _make(kind):
     elif kind == "roof":
         img = Image.new("RGB", (_px(6), _px(6)), ROOF)
     else:                                   
+        img = Image.new("RGB", (W, H), BEIGE)
         d = ImageDraw.Draw(img)
         for i in range(3):
             _window(d, (i + 0.5) * FLOOR_H, FLOOR_H * 0.52, 1.3, 1.1)
@@ -59,6 +61,7 @@ def _make(kind):
 
 
 _cache = {}
+_surface_cache = {}
 
 
 def facade_texture(kind="plain"):
@@ -69,10 +72,27 @@ def facade_texture(kind="plain"):
         path = config.TEXTURE_DIR / f"facade_{kind}{ext}"
         if path.exists():
             img = Image.open(path).convert("RGB")
-            print(f"[Facade] {kind}: dùng ảnh thật {path.name}")
+            print(f"[Facade] {kind}: use real images {path.name}")
             break
     if img is None:
         img = _make(kind)
     tex = Texture(np.asarray(img.convert("RGBA").transpose(Image.Transpose.FLIP_TOP_BOTTOM)))
     _cache[kind] = tex
     return tex
+
+
+def surface_texture(kind):
+    colors = {
+        "road": (66, 68, 71),
+        "parking": (118, 119, 115),
+        "water": (48, 112, 153),
+    }
+    if kind not in colors:
+        raise ValueError(f"Unknown surface texture: {kind}")
+    if kind not in _surface_cache:
+        rng = np.random.default_rng({"road": 1, "parking": 2, "water": 3}[kind])
+        noise = rng.integers(-6, 7, size=(64, 64, 1))
+        rgb = np.clip(np.asarray(colors[kind], dtype=np.int16)[None, None, :] + noise, 0, 255).astype(np.uint8)
+        alpha = np.full((64, 64, 1), 255, dtype=np.uint8)
+        _surface_cache[kind] = Texture(np.concatenate((rgb, alpha), axis=2))
+    return _surface_cache[kind]

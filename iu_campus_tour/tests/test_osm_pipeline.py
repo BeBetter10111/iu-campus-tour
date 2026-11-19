@@ -84,7 +84,7 @@ def test_facade_by_side():
     sq = np.array(SQUARE, float)
     walls = build_walls(sq, [], 10.0, 10.8, 3.6, kind_of_side={"N": "maroon", "S": "white"}, default_kind="plain")
     assert set(walls) == {"maroon", "white", "plain"}
-    assert side_of_normal(0, -1) == "N" and side_of_normal(1, 0) == "E"      # Bắc = -Z, Đông = +X
+    assert side_of_normal(0, -1) == "N" and side_of_normal(1, 0) == "E"      # North = -Z, East = +X
 
 
 def test_clean_ring_closed_and_dupes():
@@ -97,7 +97,7 @@ def test_extrude_roof_only():
     assert g["walls"] == {}
     v, i = g["roof"]
     n = tri_normals(v, i)
-    assert (n[:, 1] > 0).sum() == (n[:, 1] < 0).sum() > 0                    # mặt trên và mặt dưới
+    assert (n[:, 1] > 0).sum() == (n[:, 1] < 0).sum() > 0                    
 
 
 def _obj(poly, height=12.0):
@@ -110,10 +110,9 @@ def _obj(poly, height=12.0):
 def test_narrow_phase_notch_is_walkable():
     world = CollisionWorld([_obj(L_SHAPE)])
     y = config.EYE_HEIGHT
-    assert not world.collides(np.array([15.0, y, 15.0]))          # trong hộp bao nhưng ngoài chữ L -> đi được
-    assert world.collides(np.array([4.0, y, 4.0]))                # trong thân chữ L -> chặn
-    assert world.collides(np.array([8.2, y, 14.0]))               # sát tường (cách < bán kính) -> chặn
-    # đi từ khoảng trống vào tường rồi trượt dọc tường (không bị kẹt)
+    assert not world.collides(np.array([15.0, y, 15.0]))          
+    assert world.collides(np.array([4.0, y, 4.0]))                
+    assert world.collides(np.array([8.2, y, 14.0]))               
     p = world.move(np.array([15.0, y, 14.0], np.float32), np.array([-10.0, 0, 0.0], np.float32))
     assert 8.0 + config.PLAYER_RADIUS - 0.3 <= p[0] <= 15.0, p
 
@@ -143,7 +142,6 @@ def test_resolve_style_and_spawn():
 
 
 def test_skipped_buildings_ignored_by_spawn():
-    """Tòa nhà xa bị skip không được kéo điểm xuất phát ra xa khu trường."""
     from scene.osm_campus import find_spawn
     near = {"outer": [[0, 0], [40, 0], [40, 20], [0, 20]]}
     far = {"outer": [[900, 900], [940, 900], [940, 920], [900, 920]]}
@@ -154,16 +152,14 @@ def test_skipped_buildings_ignored_by_spawn():
 
 
 def test_raised_block_bridge():
-    """Cầu nối tầng 3-4: tường từ 7.2 m đến 14.4 m, có mặt dưới, người chơi đi bên dưới được."""
     from graphics.extrude import build_walls, build_underside
     base, top = 2 * 3.6, 4 * 3.6
     walls = build_walls(np.array(SQUARE, float), [], top, 10.8, 3.6, base=base)
     v, _ = walls["main"]
     assert np.allclose(v[:, 1].min(), base) and np.allclose(v[:, 1].max(), top)
-    assert abs(v[:, 7].min() - 2.0) < 1e-6 and abs(v[:, 7].max() - 4.0) < 1e-6       # 2 tầng = 2 ô texture, thẳng hàng với tòa kế bên
+    assert abs(v[:, 7].min() - 2.0) < 1e-6 and abs(v[:, 7].max() - 4.0) < 1e-6       
     uv, ui = build_underside(np.array(SQUARE, float), base)
-    assert np.all(tri_normals(uv, ui)[:, 1] < 0) and np.allclose(uv[:, 1], base)       # mặt dưới hướng xuống
-    # Va chạm: hộp bắt đầu ở y = 7.2 nên không chạm người cao 1.9 m; hộp thường chạm
+    assert np.all(tri_normals(uv, ui)[:, 1] < 0) and np.allclose(uv[:, 1], base)       
     raised = _obj(SQUARE, height=top); raised.aabb_min[1] = base
     ground = _obj(SQUARE, height=top)
     y = config.EYE_HEIGHT
@@ -180,6 +176,19 @@ def test_resolve_style_min_levels():
     assert abs(st["base"] - 7.2) < 1e-9 and abs(st["height"] - 14.4) < 1e-9 and st["facade"] == "maroon"
     plain = resolve_style({**b, "id": "way/10"}, ov)
     assert plain["base"] == 0.0
+
+
+def test_osm_surface_geometry():
+    from scene.osm_campus import build_surface_arrays, build_road_arrays, _road_width
+
+    vertices, indices = build_surface_arrays(L_SHAPE[::-1], 0.03)
+    assert np.all(tri_normals(vertices, indices)[:, 1] > 0)
+    assert abs(tri_area_sum(vertices[:, [0, 2]], indices.reshape(-1, 3)) - 256.0) < 1e-6
+
+    vertices, indices = build_road_arrays([[0, 0], [10, 0]], 4.0)
+    assert np.all(tri_normals(vertices, indices)[:, 1] > 0)
+    assert np.allclose(vertices[:, 2].min(), -2.0) and np.allclose(vertices[:, 2].max(), 2.0)
+    assert _road_width("residential") == 5.0 and _road_width("unmapped") == 4.0
 
 
 if __name__ == "__main__":
