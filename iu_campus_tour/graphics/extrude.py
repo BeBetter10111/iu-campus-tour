@@ -33,7 +33,7 @@ def triangulate(poly):
     if n < 3:
         return [], 0
     idx = list(range(n))
-    if signed_area(p) < 0:                 
+    if signed_area(p) < 0:                  
         idx.reverse()
     tris, forced = [], 0
     while len(idx) > 3:
@@ -43,12 +43,12 @@ def triangulate(poly):
             i0, i1, i2 = idx[k - 1], idx[k], idx[(k + 1) % m]
             a, b, c = p[i0], p[i1], p[i2]
             if _cross(a, b, c) <= EPS:
-                continue                    
+                continue                    # Đỉnh lõm hoặc thẳng hàng: không thể là tai
             if any(_in_triangle(p[j], a, b, c) for j in idx if j not in (i0, i1, i2)):
                 continue
             ear = k
             break
-        if ear is None:                     
+        if ear is None:                     # Suy biến: cắt ép đỉnh lồi nhất để không bị kẹt
             forced += 1
             ear = max(range(m), key=lambda k: _cross(p[idx[k - 1]], p[idx[k]], p[idx[(k + 1) % m]]))
         i0, i1, i2 = idx[ear - 1], idx[ear], idx[(ear + 1) % len(idx)]
@@ -65,9 +65,10 @@ def side_of_normal(nx, nz):
     return "S" if nz > 0 else "N"
 
 
-def build_walls(outer, holes, height, tile_w, floor_h, kind_of_side=None, default_kind="main"):
+def build_walls(outer, holes, height, tile_w, floor_h, kind_of_side=None, default_kind="main", base=0.0):
     groups = {}
     top_v = height / floor_h
+    bot_v = base / floor_h
 
     def add_ring(ring, outward_negative):
         ring = np.asarray(ring, dtype=np.float64)
@@ -87,12 +88,12 @@ def build_walls(outer, holes, height, tile_w, floor_h, kind_of_side=None, defaul
             u0, u1 = s / tile_w, (s + length) / tile_w
             s += length
             v, idx = groups.setdefault(kind, ([], []))
-            base = len(v)
-            v += [[p0[0], 0.0,    p0[1], nx, 0, nz, u0, 0.0],
-                  [p1[0], 0.0,    p1[1], nx, 0, nz, u1, 0.0],
+            start = len(v)                      # chỉ số đỉnh đầu tiên của hình chữ nhật này (KHÔNG đặt tên là `base`: trùng tham số độ cao đáy)
+            v += [[p0[0], base,   p0[1], nx, 0, nz, u0, bot_v],
+                  [p1[0], base,   p1[1], nx, 0, nz, u1, bot_v],
                   [p1[0], height, p1[1], nx, 0, nz, u1, top_v],
                   [p0[0], height, p0[1], nx, 0, nz, u0, top_v]]
-            idx += [base, base + 1, base + 2, base, base + 2, base + 3]
+            idx += [start, start + 1, start + 2, start, start + 2, start + 3]
 
     add_ring(outer, True)
     for h in holes or []:
@@ -106,6 +107,7 @@ def build_roof(outer, height, tile=6.0, both_faces=False):
     verts = [[x, height, z, 0, 1, 0, x / tile, z / tile] for x, z in outer]
     idx = []
     for i0, i1, i2 in tris:
+        # Tam giác (i0,i1,i2) có A > 0 trong (x,z) -> pháp tuyến ngược hướng +Y -> đảo thứ tự để mặt trên hướng lên
         idx += [i0, i2, i1]
     if both_faces:
         n = len(verts)
@@ -115,12 +117,22 @@ def build_roof(outer, height, tile=6.0, both_faces=False):
     return np.array(verts, np.float32), np.array(idx, np.uint32), forced
 
 
+def build_underside(outer, base, tile=6.0):
+    outer = np.asarray(outer, dtype=np.float64)
+    tris, _ = triangulate(outer)
+    verts = [[x, base, z, 0, -1, 0, x / tile, z / tile] for x, z in outer]
+    idx = [k for tri in tris for k in tri]
+    return np.array(verts, np.float32), np.array(idx, np.uint32)
+
+
 def extrude_arrays(outer, holes, height, tile_w=10.8, floor_h=3.6, roof_tile=6.0,
-                   kind_of_side=None, default_kind="main", roof_only=False):
+                   kind_of_side=None, default_kind="main", roof_only=False, base=0.0):
     outer = clean_ring(outer)
     holes = [clean_ring(h) for h in (holes or []) if len(h) >= 3]
     if len(outer) < 3:
         raise ValueError("Đường viền có ít hơn 3 đỉnh")
-    walls = {} if roof_only else build_walls(outer, holes, height, tile_w, floor_h, kind_of_side, default_kind)
+    walls = {} if roof_only else build_walls(outer, holes, height, tile_w, floor_h, kind_of_side,
+                                              default_kind, base=base)
     rv, ri, forced = build_roof(outer, height, roof_tile, both_faces=roof_only)
-    return {"walls": walls, "roof": (rv, ri), "forced": forced, "holes_ignored": bool(holes)}
+    bottom = build_underside(outer, base, roof_tile) if (base > 0 and not roof_only) else None
+    return {"walls": walls, "roof": (rv, ri), "bottom": bottom, "forced": forced, "holes_ignored": bool(holes)}

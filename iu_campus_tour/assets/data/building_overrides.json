@@ -1,58 +1,106 @@
 {
+  "_help": [
+    "Dat file nay tai assets/data/building_overrides.json (co chu 's' o 'overrides').",
+    "levels = null hoac khong co -> dung so tang trong OSM, neu OSM cung khong co thi mac dinh 2 tang (nho: 1 tang). Moi tang cao 3.6 m.",
+    "height (m) uu tien hon levels. facade: white | maroon | concrete | plain.",
+    "facade_by_side: {\"N\":\"maroon\",\"S\":\"white\",\"E\":...,\"W\":...} theo huong mat tuong (Bac la phia tren ban do). Chua dung vi chua biet mat nao do dom.",
+    "skip = true: bo toa nha khoi canh. 11 toa nam NGOAI khuon vien IU (phia tay duong William Shakespeare, phia nam duong Quang Truong Sang Tao, hoac xa hon) da duoc skip; doi thanh false neu muon hien lai.",
+    "Cac muc co chu 'CAN XAC NHAN' la phong doan dua tren vi tri/dien tich, hay sua lai.",
+    "min_levels (hoac min_height, m): khoi NANG LEN, bat dau tu tang min_levels thay vi tu mat dat (cau noi...). Quy uoc 'tang 1' la tang tret:",
+    "cau noi o tang 3-4 -> min_levels = 2, levels = 4 (day cau o 7.2 m, mai cau o 14.4 m). Nguoi choi di duoc ben duoi."
+  ],
   "by_name": {
     "A1": {
       "levels": 7,
-      "facade": "white",
-      "note": "7 tang theo thong tin ban cung cap. Mat nao do dom (maroon) chua biet -> can facade_by_side."
+      "facade": "maroon",
+      "note": "Khoi phia NAM cua cum A (Thu vien, Khoa Cong nghe Sinh hoc theo Google Maps). 7 tang. Toan bo mat ngoai va mat san trong deu mau do dom (theo xac nhan cua ban)."
     },
     "A2": {
       "levels": 7,
-      "facade": "white",
-      "note": "7 tang theo thong tin ban cung cap. Mat nao do dom (maroon) chua biet -> can facade_by_side."
+      "facade": "maroon",
+      "note": "Khoi phia BAC cua cum A (IU Book Zone theo Google Maps). 7 tang. Toan bo mat ngoai va mat san trong deu mau do dom (theo xac nhan cua ban)."
     },
     "Laboratory": {
       "levels": null,
       "facade": "plain",
-      "note": "CAN XAC NHAN so tang (hien dung mac dinh 2)."
+      "note": "Nam ngay phia bac A2; trung vi tri 'Khu thuc hanh cong nghe sinh hoc' tren Google Maps. CAN XAC NHAN so tang (hien dung mac dinh 2)."
     }
   },
-
   "by_id": {
-    "way/1216806172": {
-      "levels": null,
-      "facade": "concrete",
-      "note": "Toa nha hanh chinh IU, OSM danh dau building=construction. CAN XAC NHAN: da xay xong chua, may tang? Neu xong: doi facade thanh white va dat levels."
+    "way/499419582": {
+      "levels": 7,
+      "facade": "maroon",
+      "note": "Khoi noi phia TAY giua A1 va A2 (678 m2), mau do dom. CAN XAC NHAN so tang (dang gia dinh 7, dac tu mat dat)."
     },
-    "way/1419105580": {
-      "height": 4.5,
-      "facade": "plain",
-      "note": "building=greenhouse (nha kinh, 1119 m2). Do cao 4.5 m la UOC LUONG, CAN XAC NHAN."
+    "way/490258283": {
+      "levels": 4,
+      "min_levels": 2,
+      "facade": "maroon",
+      "note": "Khoi hep phia DONG (119 m2): chi la CAU NOI giua A1 va A2 o tang 3-4 (theo xac nhan cua ban) -> nang len tu 7.2 m den 14.4 m, ben duoi di bo xuyen qua. Quy uoc tang 1 = tang tret; neu 'tang 3-4' cua ban la lau 3-4 (tinh tu tren tang tret) thi doi min_levels=3, levels=5."
     },
     "way/259209295": {
       "levels": null,
       "facade": "plain",
-      "note": "CAN XAC NHAN: dien tich 1213 m2 va 5 dinh, co the la can-tin IU (suy doan theo dien tich tu anh OSM truoc do)."
+      "note": "IU Canteen (khoi chinh, 1213 m2, khop vi tri va dien tich voi anh OSM). CAN XAC NHAN so tang."
     },
-
+    "way/490258285": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Khoi phu phia tay cua can-tin (586 m2). CAN XAC NHAN."
+    },
+    "way/490258286": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Khoi phu phia tay-bac cua can-tin (248 m2). CAN XAC NHAN."
+    },
+    "way/1216806172": {
+      "levels": null,
+      "facade": "concrete",
+      "note": "Toa nha hanh chinh IU (Google Maps goi la A3 building), OSM danh dau building=construction. CAN XAC NHAN: da xay xong chua, may tang? Neu xong: doi facade thanh white va dat levels."
+    },
     "way/717915808": {
-      "skip": false,
-      "note": "Nha Van hoa Sinh vien (OSM: 6 tang). Co the nam NGOAI khuon vien IU -> neu dung, doi skip thanh true."
+      "skip": true,
+      "note": "Nha Van hoa Sinh vien (OSM: 6 tang). Nam ~250-340 m ve phia NAM, ben kia duong Quang Truong Sang Tao -> ngoai IU."
     },
     "way/290484111": {
-      "skip": false,
-      "note": "Nha H1. Chua ro thuoc IU hay khu ben canh -> CAN XAC NHAN."
+      "skip": true,
+      "note": "Nha H1. Nam ~250-330 m ve phia DONG-BAC -> ngoai IU."
     },
     "way/290482143": {
-      "skip": false,
-      "note": "Nha H2 (OSM: 8 tang). Chua ro thuoc IU hay khu ben canh -> CAN XAC NHAN."
+      "skip": true,
+      "note": "Nha H2 (OSM: 8 tang). Nam ~290-360 m ve phia DONG-BAC -> ngoai IU."
     },
     "way/290242864": {
-      "skip": false,
-      "note": "Nha dieu hanh (building: office). Chua ro thuoc IU hay khu ben canh -> CAN XAC NHAN."
+      "skip": true,
+      "note": "Nha dieu hanh. Nam ~300-350 m ve phia TAY-NAM -> ngoai IU."
     },
     "way/290326857": {
-      "skip": false,
-      "note": "BK English. Ten khong giong toa cua IU -> co the nam ngoai khuon vien, CAN XAC NHAN."
+      "skip": true,
+      "note": "BK English. Nam ~310-350 m ve phia DONG, ben kia duong Le Quy Don / Ta Quang Buu -> ngoai IU."
+    },
+    "way/738556649": {
+      "skip": true,
+      "note": "Nam ~180-230 m ve phia NAM, ben kia duong Quang Truong Sang Tao -> ngoai IU."
+    },
+    "way/727362141": {
+      "skip": true,
+      "note": "Nam ben kia duong William Shakespeare (phia TAY) -> ngoai IU."
+    },
+    "relation/3858829#0": {
+      "skip": true,
+      "note": "Co 2 lo (san trong). Nam ben kia duong William Shakespeare -> ngoai IU."
+    },
+    "relation/15820688#0": {
+      "skip": true,
+      "note": "Co 2 lo (san trong). Nam ben kia duong William Shakespeare -> ngoai IU."
+    },
+    "way/1419105580": {
+      "skip": true,
+      "note": "Nha kinh (greenhouse), nam xa ve phia TAY, ben kia duong William Shakespeare -> ngoai IU. (Nha kinh 'Nursery greenhouse' trong anh Google Maps KHONG co trong du lieu OSM nay.)"
+    },
+    "way/1419105581": {
+      "skip": true,
+      "note": "Nam xa ve phia TAY, ben kia duong William Shakespeare -> ngoai IU."
     }
   }
 }

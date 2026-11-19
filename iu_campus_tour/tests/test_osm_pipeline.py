@@ -1,3 +1,5 @@
+"""Kiểm thử đường ống OSM (không cần GPU):  python tests/test_osm_pipeline.py"""
+
 import os
 import sys
 import types
@@ -138,6 +140,46 @@ def test_resolve_style_and_spawn():
     data = {"buildings": [big, site]}
     (sx, sz), yaw = find_spawn(data, [rings_to_edges([big["outer"]])])
     assert not point_in_edges(sx, sz, rings_to_edges([big["outer"]])) and sz > 20, (sx, sz)
+
+
+def test_skipped_buildings_ignored_by_spawn():
+    """Tòa nhà xa bị skip không được kéo điểm xuất phát ra xa khu trường."""
+    from scene.osm_campus import find_spawn
+    near = {"outer": [[0, 0], [40, 0], [40, 20], [0, 20]]}
+    far = {"outer": [[900, 900], [940, 900], [940, 920], [900, 920]]}
+    (sx, sz), _ = find_spawn({"buildings": [near]}, [rings_to_edges([near["outer"]])])
+    assert abs(sx - 20) < 1 and 20 < sz < 40, (sx, sz)
+    (fx, fz), _ = find_spawn({"buildings": [near, far]}, [rings_to_edges([near["outer"]])])
+    assert fz > 100, "ví dụ minh họa lỗi nếu KHÔNG lọc skip: điểm xuất phát bị kéo ra xa"
+
+
+def test_raised_block_bridge():
+    """Cầu nối tầng 3-4: tường từ 7.2 m đến 14.4 m, có mặt dưới, người chơi đi bên dưới được."""
+    from graphics.extrude import build_walls, build_underside
+    base, top = 2 * 3.6, 4 * 3.6
+    walls = build_walls(np.array(SQUARE, float), [], top, 10.8, 3.6, base=base)
+    v, _ = walls["main"]
+    assert np.allclose(v[:, 1].min(), base) and np.allclose(v[:, 1].max(), top)
+    assert abs(v[:, 7].min() - 2.0) < 1e-6 and abs(v[:, 7].max() - 4.0) < 1e-6       # 2 tầng = 2 ô texture, thẳng hàng với tòa kế bên
+    uv, ui = build_underside(np.array(SQUARE, float), base)
+    assert np.all(tri_normals(uv, ui)[:, 1] < 0) and np.allclose(uv[:, 1], base)       # mặt dưới hướng xuống
+    # Va chạm: hộp bắt đầu ở y = 7.2 nên không chạm người cao 1.9 m; hộp thường chạm
+    raised = _obj(SQUARE, height=top); raised.aabb_min[1] = base
+    ground = _obj(SQUARE, height=top)
+    y = config.EYE_HEIGHT
+    assert not CollisionWorld([raised]).collides(np.array([5.0, y, 5.0]))
+    assert CollisionWorld([ground]).collides(np.array([5.0, y, 5.0]))
+
+
+def test_resolve_style_min_levels():
+    from scene.osm_campus import resolve_style, _norm
+    ov = {"by_name": {}, "by_id": {"way/9": {"levels": 4, "min_levels": 2, "facade": "maroon"}}}
+    b = {"id": "way/9", "name": "", "kind": "university", "levels": None, "height": None,
+         "outer": [[0, 0], [4, 0], [4, 22], [0, 22]]}
+    st = resolve_style(b, ov)
+    assert abs(st["base"] - 7.2) < 1e-9 and abs(st["height"] - 14.4) < 1e-9 and st["facade"] == "maroon"
+    plain = resolve_style({**b, "id": "way/10"}, ov)
+    assert plain["base"] == 0.0
 
 
 if __name__ == "__main__":

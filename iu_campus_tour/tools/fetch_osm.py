@@ -1,4 +1,20 @@
 #!/usr/bin/env python3
+"""Tải dữ liệu OpenStreetMap quanh trường và đổi sang tọa độ mét -> assets/data/campus_osm.json
+
+Cách dùng (chỉ cần thư viện chuẩn của Python, cần Internet):
+
+  1. Mở https://www.openstreetmap.org, phóng to vào GIỮA khuôn viên IU, copy đường link trên thanh địa chỉ
+     (dạng ...#map=18/10.87xxx/106.80xxx), rồi chạy:
+
+       python tools/fetch_osm.py --url "https://www.openstreetmap.org/#map=18/10.87xxx/106.80xxx"
+
+  2. Hoặc nhập thẳng tọa độ:   python tools/fetch_osm.py --center 10.87xxx 106.80xxx --radius 350
+  3. Hoặc khung chữ nhật:      python tools/fetch_osm.py --bbox NAM TÂY BẮC ĐÔNG
+
+Hệ tọa độ đầu ra (mét): x = Đông, z = Nam (Bắc là -Z), gốc (0,0) ở giữa nhóm tòa nhà.
+Dữ liệu (c) OpenStreetMap contributors, giấy phép ODbL -> nhớ ghi nguồn trong báo cáo.
+"""
+
 import argparse
 import json
 import math
@@ -19,7 +35,7 @@ M_PER_DEG_LAT = 110574.0
 M_PER_DEG_LON_EQ = 111320.0
 
 
-# tham số
+# ------------------------------------------------------------------ tham số
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--url", help="link OpenStreetMap có #map=zoom/lat/lon")
@@ -52,7 +68,7 @@ def get_bbox(args):
     return (lat - dlat, lon - dlon, lat + dlat, lon + dlon)
 
 
-# Overpass
+# ----------------------------------------------------------------- Overpass
 def build_query(bbox):
     b = ",".join(f"{v:.6f}" for v in bbox)
     return f"""[out:json][timeout:90];
@@ -60,7 +76,7 @@ def build_query(bbox):
   way["building"]({b});
   relation["building"]({b});
   way["highway"]({b});
-  way["amenity"="parking"]({b});
+  way["amenity"~"^(parking|motorcycle_parking|bicycle_parking)$"]({b});
   way["natural"="water"]({b});
   node["natural"="tree"]({b});
 );
@@ -84,6 +100,7 @@ def fetch(query):
     sys.exit(f"Không tải được dữ liệu Overpass ({last}). Kiểm tra mạng rồi chạy lại.")
 
 
+# ------------------------------------------------------------ xử lý dữ liệu
 def assemble_rings(segments):
     """Nối các đoạn đường (way) rời nhau thành các vòng khép kín (cho multipolygon)."""
     segs = [list(s) for s in segments if len(s) > 1]
@@ -118,6 +135,7 @@ def parse_number(text):
 
 
 def convert(osm):
+    """Dữ liệu Overpass -> dict (tọa độ mét)."""
     out = {"buildings": [], "roads": [], "parking": [], "water": [], "trees": []}
     latlon = lambda geom: [(g["lat"], g["lon"]) for g in geom]
 
@@ -136,7 +154,7 @@ def convert(osm):
             elif "highway" in tags:
                 out["roads"].append({"id": eid, "kind": tags["highway"], "name": tags.get("name", ""),
                                      "points": pts})
-            elif tags.get("amenity") == "parking" and closed:
+            elif tags.get("amenity") in ("parking", "motorcycle_parking", "bicycle_parking") and closed:
                 out["parking"].append({"id": eid, "ring": pts[:-1]})
             elif tags.get("natural") == "water" and closed:
                 out["water"].append({"id": eid, "ring": pts[:-1]})
@@ -157,7 +175,7 @@ def _building(eid, tags, ring, holes):
 
 
 def to_local(data, lat0, lon0):
-    """(lat, lon) -> (x, z) m: x = (lon-lon0)·111320·cos(lat0) (East +), z = -(lat-lat0)·110574 (North = -Z)."""
+    """(lat, lon) -> (x, z) mét: x = (lon-lon0)·111320·cos(lat0) (Đông +), z = -(lat-lat0)·110574 (Bắc = -Z)."""
     kx = M_PER_DEG_LON_EQ * math.cos(math.radians(lat0))
     f = lambda p: [round((p[1] - lon0) * kx, 2), round(-(p[0] - lat0) * M_PER_DEG_LAT, 2)]
     for b in data["buildings"]:
@@ -173,6 +191,7 @@ def to_local(data, lat0, lon0):
 
 
 def recenter(data):
+    """Dời gốc (0,0) về giữa nhóm tòa nhà. Trả về độ dời (sx, sz) đã trừ."""
     pts = [p for b in data["buildings"] for p in b["outer"]]
     if not pts:
         return 0.0, 0.0
@@ -210,7 +229,7 @@ def main():
     sx, sz = recenter(data)
     data["source"] = "OpenStreetMap contributors (ODbL) - https://www.openstreetmap.org/copyright"
     data["origin"] = {"lat": lat0, "lon": lon0, "shift_x": sx, "shift_z": sz,
-                      "note": "x=East, z=South (North=-Z); origin (0,0) = center of building group"}
+                      "note": "x=Dong, z=Nam (Bac=-Z); goc (0,0) = giua nhom toa nha"}
     path = OUT_DIR / "campus_osm.json"
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
