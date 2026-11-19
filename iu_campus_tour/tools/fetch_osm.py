@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""Tải dữ liệu OpenStreetMap quanh trường và đổi sang tọa độ mét -> assets/data/campus_osm.json
-
-Cách dùng (chỉ cần thư viện chuẩn của Python, cần Internet):
-
-  1. Mở https://www.openstreetmap.org, phóng to vào GIỮA khuôn viên IU, copy đường link trên thanh địa chỉ
-     (dạng ...#map=18/10.87xxx/106.80xxx), rồi chạy:
-
-       python tools/fetch_osm.py --url "https://www.openstreetmap.org/#map=18/10.87xxx/106.80xxx"
-
-  2. Hoặc nhập thẳng tọa độ:   python tools/fetch_osm.py --center 10.87xxx 106.80xxx --radius 350
-  3. Hoặc khung chữ nhật:      python tools/fetch_osm.py --bbox NAM TÂY BẮC ĐÔNG
-
-Hệ tọa độ đầu ra (mét): x = Đông, z = Nam (Bắc là -Z), gốc (0,0) ở giữa nhóm tòa nhà.
-Dữ liệu (c) OpenStreetMap contributors, giấy phép ODbL -> nhớ ghi nguồn trong báo cáo.
-"""
-
 import argparse
 import json
 import math
@@ -35,7 +19,7 @@ M_PER_DEG_LAT = 110574.0
 M_PER_DEG_LON_EQ = 111320.0
 
 
-# ------------------------------------------------------------------ tham số
+# Parameters: --url, --center, --radius, --bbox, --raw
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--url", help="link OpenStreetMap có #map=zoom/lat/lon")
@@ -68,7 +52,7 @@ def get_bbox(args):
     return (lat - dlat, lon - dlon, lat + dlat, lon + dlon)
 
 
-# ----------------------------------------------------------------- Overpass
+# Overpass
 def build_query(bbox):
     b = ",".join(f"{v:.6f}" for v in bbox)
     return f"""[out:json][timeout:90];
@@ -100,7 +84,7 @@ def fetch(query):
     sys.exit(f"Không tải được dữ liệu Overpass ({last}). Kiểm tra mạng rồi chạy lại.")
 
 
-# ------------------------------------------------------------ xử lý dữ liệu
+# Parse Overpass data
 def assemble_rings(segments):
     """Nối các đoạn đường (way) rời nhau thành các vòng khép kín (cho multipolygon)."""
     segs = [list(s) for s in segments if len(s) > 1]

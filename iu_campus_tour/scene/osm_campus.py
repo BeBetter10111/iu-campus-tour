@@ -4,21 +4,32 @@ import math
 import numpy as np
 
 import config
-from graphics.extrude import clean_ring, extrude_arrays, signed_area, triangulate
+from graphics.extrude import extrude_arrays, signed_area
 from graphics.mesh import Mesh, create_box
-from graphics.procedural_textures import facade_texture, FLOOR_H, surface_texture, TILE_W
+from graphics.procedural_textures import (facade_texture, ground_texture as make_ground_texture, FLOOR_H, TILE_W,
+                                          GRASS_TILE, ASPHALT_TILE, MARKED_TILE, PAVING_TILE, CONCRETE_TILE)
+from graphics.roads import polyline_strip, polygon_flat, merge_meshes
 from scene.geometry2d import rings_to_edges, circle_hits_rings
 from scene.scene import Scene, SceneObject
 
 DATA_DIR = getattr(config, "DATA_DIR", config.ASSET_DIR / "data")
+ROAD_STYLE = {
+    "tertiary":      ("asphalt_marked", 7.5, 0.030, MARKED_TILE, True),
+    "tertiary_link": ("asphalt_marked", 5.0, 0.032, MARKED_TILE, True),
+    "residential":   ("asphalt",        6.0, 0.034, ASPHALT_TILE, False),
+    "unclassified":  ("asphalt",        5.0, 0.036, ASPHALT_TILE, False),
+    "service":       ("asphalt",        4.5, 0.040, ASPHALT_TILE, False),
+    "track":         ("concrete",       3.0, 0.045, CONCRETE_TILE, False),
+    "cycleway":      ("asphalt",        2.5, 0.050, ASPHALT_TILE, False),
+    "pedestrian":    ("paving",         4.0, 0.055, PAVING_TILE, False),
+    "footway":       ("paving",         2.0, 0.060, PAVING_TILE, False),
+    "path":          ("paving",         1.5, 0.062, PAVING_TILE, False),
+}
+PARKING_Y = 0.040
+ROAD_MARGIN = 300.0                                  
+RAISED_MIN = 2.5                                     
 ROOF_ONLY_KINDS = {"roof", "carport", "canopy"}      
 SPAWN_CLEARANCE = 6.0                                
-ROAD_WIDTHS = {
-    "motorway": 10.0, "trunk": 9.0, "primary": 8.0, "secondary": 7.0,
-    "tertiary": 6.0, "residential": 5.0, "unclassified": 4.5,
-    "service": 4.0, "track": 3.0, "path": 2.0, "footway": 2.0,
-    "pedestrian": 3.0, "steps": 1.5,
-}
 
 
 def _norm(s):
@@ -31,7 +42,6 @@ def load_json(path):
 
 
 def load_overrides(path):
-    """Read building_overrides.json. Missing file -> rỗng."""
     if not path.exists():
         return {"by_name": {}, "by_id": {}}
     raw = load_json(path)
@@ -41,88 +51,6 @@ def load_overrides(path):
 
 def _polygon_area(ring):
     return abs(signed_area(ring))
-
-
-def build_surface_arrays(ring, y, tile=8.0):
-    ring = clean_ring(ring)
-    if len(ring) < 3:
-        raise ValueError("Đường viền có ít hơn 3 đỉnh")
-    triangles, _ = triangulate(ring)
-    vertices = np.array([[x, y, z, 0, 1, 0, x / tile, z / tile] for x, z in ring], dtype=np.float32)
-    indices = np.array([index for tri in triangles for index in (tri[0], tri[2], tri[1])],
-                       dtype=np.uint32)
-    return vertices, indices
-
-
-def build_road_arrays(points, width, y=0.025, tile=8.0):
-    points = np.asarray(points, dtype=np.float64)
-    if points.ndim != 2 or points.shape[1] != 2:
-        raise ValueError("Đường cần danh sách điểm 2D")
-    if width <= 0:
-        raise ValueError("Chiều rộng đường phải lớn hơn 0")
-
-    clean = [points[0]] if len(points) else []
-    for point in points[1:]:
-        if np.linalg.norm(point - clean[-1]) >= 0.05:
-            clean.append(point)
-    points = np.asarray(clean, dtype=np.float64)
-    if len(points) < 2:
-        raise ValueError("Less than 2 distinct points after cleaning")
-
-    segments = np.diff(points, axis=0)
-    lengths = np.linalg.norm(segments, axis=1)
-    directions = segments / lengths[:, None]
-    normals = np.column_stack((-directions[:, 1], directions[:, 0]))
-    offsets = np.empty_like(points)
-    half_width = width / 2.0
-    offsets[0] = normals[0] * half_width
-    offsets[-1] = normals[-1] * half_width
-    for i in range(1, len(points) - 1):
-        miter = normals[i - 1] + normals[i]
-        miter_length = np.linalg.norm(miter)
-        if miter_length < 1e-8:
-            offsets[i] = normals[i] * half_width
-            continue
-        miter /= miter_length
-        denominator = float(np.dot(miter, normals[i]))
-        if denominator <= 0.25:
-            offsets[i] = normals[i] * half_width
-        else:
-            offsets[i] = miter * min(half_width / denominator, half_width * 3.0)
-
-    distance = np.concatenate(([0.0], np.cumsum(lengths)))
-    vertices = []
-    for i, point in enumerate(points):
-        u = distance[i] / tile
-        left, right = point + offsets[i], point - offsets[i]
-        vertices.extend(([left[0], y, left[1], 0, 1, 0, u, 1],
-                         [right[0], y, right[1], 0, 1, 0, u, 0]))
-    indices = []
-    for i in range(len(points) - 1):
-        left, right = 2 * i, 2 * i + 1
-        next_left, next_right = left + 2, right + 2
-        indices.extend((left, next_left, next_right, left, next_right, right))
-    return np.asarray(vertices, dtype=np.float32), np.asarray(indices, dtype=np.uint32)
-
-
-def _combine_mesh_arrays(parts):
-    if not parts:
-        return None
-    vertices, indices = [], []
-    offset = 0
-    for part_vertices, part_indices in parts:
-        if len(part_vertices) == 0 or len(part_indices) == 0:
-            continue
-        vertices.append(part_vertices)
-        indices.append(part_indices + offset)
-        offset += len(part_vertices)
-    if not vertices:
-        return None
-    return np.concatenate(vertices), np.concatenate(indices)
-
-
-def _road_width(kind):
-    return ROAD_WIDTHS.get(str(kind or "").lower(), 4.0)
 
 
 def resolve_style(b, overrides):
@@ -174,7 +102,7 @@ def find_spawn(data, collider_edges):
     pts = np.array([p for b in data["buildings"] for p in b["outer"]], dtype=np.float64)
     if len(pts) == 0:
         return (0.0, 15.0), -90.0
-    cx, cz = (pts.min(axis=0) + pts.max(axis=0)) / 2          
+    cx, cz = (pts.min(axis=0) + pts.max(axis=0)) / 2          # Tâm hộp bao (không dùng trung bình đỉnh: lệch về tòa nhiều đỉnh)
     start = np.array([cx, pts[:, 1].max() + 10.0])
     candidates = [start]
     for r in np.arange(6.0, 400.0, 6.0):
@@ -187,50 +115,51 @@ def find_spawn(data, collider_edges):
     return (float(start[0]), float(start[1])), -90.0
 
 
-def build_campus_from_osm(data, overrides=None, ground_texture=None):
+def add_ground_layers(scene, data, bounds):
+    x0, z0, x1, z1 = bounds
+    inside = lambda pts: any(x0 <= p[0] <= x1 and z0 <= p[1] <= z1 for p in pts)
+    groups, count = {}, 0
+    for k, r in enumerate(data.get("roads", [])):
+        style = ROAD_STYLE.get(r.get("kind"))
+        if style is None or not inside(r["points"]):
+            continue
+        tex_kind, width, y, tile, full = style
+        pts = r["points"]
+        closed = len(pts) > 3 and pts[0] == pts[-1]
+        # Mỗi đường lệch độ cao thêm vài phần nghìn mét: các đường CÙNG loại chồng nhau ở ngã ba không tranh chấp độ sâu
+        part = polyline_strip(pts, width, y + 0.0015 * (k % 6), tile, full_width=full, closed=closed)
+        if part is not None:
+            groups.setdefault(tex_kind, []).append(part)
+            count += 1
+    for pk in data.get("parking", []):
+        if inside(pk["ring"]):
+            part = polygon_flat(pk["ring"], PARKING_Y, CONCRETE_TILE)
+            if part is not None:
+                groups.setdefault("concrete", []).append(part)
+                count += 1
+    for tex_kind, parts in groups.items():
+        v, i = merge_meshes(parts)
+        scene.add(_make_object(Mesh(v, i), make_ground_texture(tex_kind), cast_shadow=False,
+                               collidable=False, specular=0.02, shininess=8.0))
+    return count, len(groups)
+
+
+def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=None):
     overrides = overrides or {"by_name": {}, "by_id": {}}
     scene = Scene()
 
     active = [b for b in data["buildings"] if not resolve_style(b, overrides)["skip"]]
 
-    map_points = [p for b in active for p in b["outer"]]
-    map_points.extend(p for road in data.get("roads", []) for p in road.get("points", []))
-    map_points.extend(p for area in data.get("parking", []) for p in area.get("ring", []))
-    map_points.extend(p for area in data.get("water", []) for p in area.get("ring", []))
-    map_points.extend(data.get("trees", []))
-    extent = max([abs(c) for p in map_points for c in p] + [100.0])
+    extent = max([abs(c) for b in active for p in b["outer"] for c in p] + [100.0])
     G = 2.0 * (extent + 250.0)                            # Mặt đất rộng hơn khu nhà rất nhiều
-    if ground_texture is not None:
-        scene.add(_make_object(create_box((G, 0.2, G), tex_size=6.0), ground_texture,
-                               position=(0, -0.1, 0), cast_shadow=False, collidable=False,
-                               specular=0.02, shininess=8.0))
-
-    feature_report = []
-    roads = []
-    for road in data.get("roads", []):
-        try:
-            roads.append(build_road_arrays(road.get("points", []), _road_width(road.get("kind"))))
-        except ValueError as e:
-            feature_report.append(f"  bỏ qua đường {road.get('id')}: {e}")
-    road_mesh = _combine_mesh_arrays(roads)
-    if road_mesh:
-        scene.add(_make_object(Mesh(*road_mesh), surface_texture("road"), cast_shadow=False,
-                               specular=0.02, shininess=8.0))
-
-    for key, y, texture_kind in (("parking", 0.035, "parking"), ("water", 0.015, "water")):
-        surfaces = []
-        for area in data.get(key, []):
-            try:
-                surfaces.append(build_surface_arrays(area.get("ring", []), y))
-            except ValueError as e:
-                feature_report.append(f"  bỏ qua {key} {area.get('id')}: {e}")
-        mesh_data = _combine_mesh_arrays(surfaces)
-        if mesh_data:
-            scene.add(_make_object(Mesh(*mesh_data), surface_texture(texture_kind), cast_shadow=False,
-                                   specular=0.02, shininess=8.0))
+    scene.add(_make_object(create_box((G, 0.2, G), tex_size=GRASS_TILE),
+                           ground_texture if ground_texture is not None else make_ground_texture("grass"),
+                           position=(0, -0.1, 0), cast_shadow=False, collidable=False,
+                           specular=0.02, shininess=8.0))
 
     roof_tex = facade_texture("roof")
     collider_edges, report, n_walls = [], [], 0
+    obstacle_edges = []                                    # Tường tòa nhà mà tuyến tour phải tránh (cầu nối nâng cao thì không)
     for b in sorted(active, key=lambda b: -_polygon_area(b["outer"])):
         st = resolve_style(b, overrides)
         try:
@@ -243,6 +172,8 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None):
 
         rings = [b["outer"]] + [h for h in (b.get("holes") or [])]
         edges = rings_to_edges(rings)
+        if st["base"] < RAISED_MIN and not st["roof_only"]:
+            obstacle_edges.append(edges)
         xs, zs = np.array(b["outer"])[:, 0], np.array(b["outer"])[:, 1]
         primary = True
         for kind, (v, i) in geo["walls"].items():
@@ -258,7 +189,7 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None):
             n_walls += 1
         rv, ri = geo["roof"]
         scene.add(_make_object(Mesh(rv, ri), roof_tex, specular=0.05))
-        if geo["bottom"] is not None:                     
+        if geo["bottom"] is not None:                      # Mặt dưới của khối nâng lên
             bv, bi = geo["bottom"]
             scene.add(_make_object(Mesh(bv, bi), roof_tex, specular=0.02))
 
@@ -267,15 +198,34 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None):
             report.append(f"  {label}: " + ("có lỗ/sân trong (mái phủ kín lỗ) " if geo["holes_ignored"] else "")
                           + (f"{geo['forced']} lần cắt tai ép (đường viền suy biến)" if geo["forced"] else ""))
 
+    all_pts = np.array([p for b in active for p in b["outer"]], dtype=np.float64)
+    if len(all_pts):
+        lo, hi = all_pts.min(axis=0) - ROAD_MARGIN, all_pts.max(axis=0) + ROAD_MARGIN
+        n_roads, n_groups = add_ground_layers(scene, data, (lo[0], lo[1], hi[0], hi[1]))
+        print(f"[OSM] đã trải {n_roads} đường/lối đi/bãi xe ({n_groups} nhóm texture)")
+
+    scene.tour_waypoints, scene.tour_info = None, None
+    if tour_spec:
+        try:
+            from scene.tour_route import build_tour
+            tour = build_tour(data.get("roads", []), tour_spec, obstacle_edges,
+                              eye_height=getattr(config, "EYE_HEIGHT", 1.7))
+            scene.tour_waypoints, scene.tour_info = tour["waypoints"], tour
+            speed = getattr(config, "TOUR_SPEED", 3.5)
+            print(f"[Tour] {len(tour['waypoints'])} waypoint, dài {tour['length']:.0f} m "
+                  f"(~{tour['length'] / speed / 60:.1f} phút ở {speed} m/s), cách tường tối thiểu {tour['clearance']:.1f} m")
+            for w in tour["warnings"]:
+                print("[Tour] cảnh báo:", w)
+        except Exception as e:
+            import traceback
+            print(f"[Tour] Không dựng được tuyến tự động ({e}) -> dùng config.TOUR_WAYPOINTS:")
+            traceback.print_exc()
+
     (sx, sz), yaw = find_spawn({"buildings": active}, collider_edges)
     scene.spawn_pos = (sx, config.EYE_HEIGHT, sz)
     scene.spawn_yaw = yaw
     print(f"[OSM] {len(active)}/{len(data['buildings'])} tòa nhà (đã bỏ {len(data['buildings']) - len(active)} tòa skip) -> {len(scene.objects)} vật thể "
           f"({n_walls} nhóm tường); điểm xuất phát ({sx:.1f}, {sz:.1f})")
-    print(f"[OSM] lớp nền: {len(roads)} đường, {len(data.get('parking', []))} bãi xe, "
-          f"{len(data.get('water', []))} vùng nước, {len(data.get('trees', []))} cây")
-    for line in feature_report:
-        print("[OSM] cảnh báo:" + line)
     for line in report:
         print("[OSM] cảnh báo:" + line)
     return scene

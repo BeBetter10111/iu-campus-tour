@@ -2,6 +2,7 @@ import numpy as np
 
 EPS = 1e-9
 
+# hình học 2D
 def signed_area(poly):
     p = np.asarray(poly, dtype=np.float64)
     q = np.roll(p, -1, axis=0)
@@ -33,7 +34,7 @@ def triangulate(poly):
     if n < 3:
         return [], 0
     idx = list(range(n))
-    if signed_area(p) < 0:                  
+    if signed_area(p) < 0:                 
         idx.reverse()
     tris, forced = [], 0
     while len(idx) > 3:
@@ -107,7 +108,6 @@ def build_roof(outer, height, tile=6.0, both_faces=False):
     verts = [[x, height, z, 0, 1, 0, x / tile, z / tile] for x, z in outer]
     idx = []
     for i0, i1, i2 in tris:
-        # Tam giác (i0,i1,i2) có A > 0 trong (x,z) -> pháp tuyến ngược hướng +Y -> đảo thứ tự để mặt trên hướng lên
         idx += [i0, i2, i1]
     if both_faces:
         n = len(verts)

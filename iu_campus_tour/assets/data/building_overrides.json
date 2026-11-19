@@ -1,4 +1,14 @@
 {
+  "_help": [
+    "Dat file nay tai assets/data/building_overrides.json (co chu 's' o 'overrides').",
+    "levels = null hoac khong co -> dung so tang trong OSM, neu OSM cung khong co thi mac dinh 2 tang (nho: 1 tang). Moi tang cao 3.6 m.",
+    "height (m) uu tien hon levels. facade: white | maroon | concrete | plain.",
+    "facade_by_side: {\"N\":\"maroon\",\"S\":\"white\",\"E\":...,\"W\":...} theo huong mat tuong (Bac la phia tren ban do). Chua dung vi chua biet mat nao do dom.",
+    "skip = true: bo toa nha khoi canh. 11 toa nam NGOAI khuon vien IU (phia tay duong William Shakespeare, phia nam duong Quang Truong Sang Tao, hoac xa hon) da duoc skip; doi thanh false neu muon hien lai.",
+    "Cac muc co chu 'CAN XAC NHAN' la phong doan dua tren vi tri/dien tich, hay sua lai.",
+    "min_levels (hoac min_height, m): khoi NANG LEN, bat dau tu tang min_levels thay vi tu mat dat (cau noi...). Quy uoc 'tang 1' la tang tret:",
+    "cau noi o tang 3-4 -> min_levels = 2, levels = 4 (day cau o 7.2 m, mai cau o 14.4 m). Nguoi choi di duoc ben duoi."
+  ],
   "by_name": {
     "A1": {
       "levels": 7,
@@ -45,8 +55,8 @@
     },
     "way/1216806172": {
       "levels": null,
-      "facade": "white",
-      "note": "Toa nha hanh chinh IU (A3); da hoan thanh theo xac nhan cua nguoi dung. Chua ro so tang; hien thi mac dinh 3 tang theo quy tac cho building=construction, can cap nhat khi co thong tin."
+      "facade": "concrete",
+      "note": "Toa nha hanh chinh IU (Google Maps goi la A3 building), OSM danh dau building=construction. CAN XAC NHAN: da xay xong chua, may tang? Neu xong: doi facade thanh white va dat levels."
     },
     "way/717915808": {
       "skip": true,

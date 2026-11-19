@@ -1,0 +1,23 @@
+{
+  "_help": [
+    "Tuyen tham quan tu dong, khep kin, di theo duong/loi di trong du lieu OSM. Toa do (x, z) theo met: x = Dong, z = Nam (Bac = -Z).",
+    "stops: danh sach diem dung theo thu tu. 'snap': [x, z] dinh vao duong gan nhat (giua hai diem snap di theo duong ngan nhat).",
+    "'free': [[x, z], ...] di thang qua cac diem (vao san trong, ngoai duong). Dat cac diem free cach tuong it nhat 3 m.",
+    "clearance: khoang cach toi thieu toi tuong (m). eye_height: do cao mat (m). corner_smoothing: do rong bo cua (m)."
+  ],
+  "eye_height": 1.7,
+  "clearance": 2.0,
+  "corner_smoothing": 10.0,
+  "stops": [
+    {"name": "Loi vao khu A (A1)",            "snap": [-57.3, 39.5]},
+    {"name": "Mat truoc toa hanh chinh IU",   "snap": [-28.0, 39.7]},
+    {"name": "Goc Dong-Nam khu A",            "snap": [11.3, 39.8]},
+    {"name": "Phia Dong cum A",               "snap": [10.2, -7.9]},
+    {"name": "San trong cum A (qua cau noi)", "free": [[4, -10], [-29, -10], [-68, -10], [-76, -5.5], [-68, -1], [-29, -1], [4, -1]]},
+    {"name": "Ra lai duong phia Dong",        "snap": [10.2, -7.9]},
+    {"name": "Phia Bac - Phong thi nghiem",   "snap": [-72.9, -42.9]},
+    {"name": "Goc Tay-Bac khu A",             "snap": [-115.6, -43.5]},
+    {"name": "Phia Tay khoi noi",             "snap": [-117.1, -1.5]},
+    {"name": "Can-tin IU",                    "snap": [-141.7, 20.0]}
+  ]
+}

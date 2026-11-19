@@ -1,5 +1,3 @@
-"""Kiểm thử đường ống OSM (không cần GPU):  python tests/test_osm_pipeline.py"""
-
 import os
 import sys
 import types
@@ -84,7 +82,7 @@ def test_facade_by_side():
     sq = np.array(SQUARE, float)
     walls = build_walls(sq, [], 10.0, 10.8, 3.6, kind_of_side={"N": "maroon", "S": "white"}, default_kind="plain")
     assert set(walls) == {"maroon", "white", "plain"}
-    assert side_of_normal(0, -1) == "N" and side_of_normal(1, 0) == "E"      # North = -Z, East = +X
+    assert side_of_normal(0, -1) == "N" and side_of_normal(1, 0) == "E"      # Bắc = -Z, Đông = +X
 
 
 def test_clean_ring_closed_and_dupes():
@@ -97,7 +95,7 @@ def test_extrude_roof_only():
     assert g["walls"] == {}
     v, i = g["roof"]
     n = tri_normals(v, i)
-    assert (n[:, 1] > 0).sum() == (n[:, 1] < 0).sum() > 0                    
+    assert (n[:, 1] > 0).sum() == (n[:, 1] < 0).sum() > 0                    # mặt trên và mặt dưới
 
 
 def _obj(poly, height=12.0):
@@ -110,9 +108,10 @@ def _obj(poly, height=12.0):
 def test_narrow_phase_notch_is_walkable():
     world = CollisionWorld([_obj(L_SHAPE)])
     y = config.EYE_HEIGHT
-    assert not world.collides(np.array([15.0, y, 15.0]))          
-    assert world.collides(np.array([4.0, y, 4.0]))                
-    assert world.collides(np.array([8.2, y, 14.0]))               
+    assert not world.collides(np.array([15.0, y, 15.0]))          # trong hộp bao nhưng ngoài chữ L -> đi được
+    assert world.collides(np.array([4.0, y, 4.0]))                # trong thân chữ L -> chặn
+    assert world.collides(np.array([8.2, y, 14.0]))               # sát tường (cách < bán kính) -> chặn
+    # đi từ khoảng trống vào tường rồi trượt dọc tường (không bị kẹt)
     p = world.move(np.array([15.0, y, 14.0], np.float32), np.array([-10.0, 0, 0.0], np.float32))
     assert 8.0 + config.PLAYER_RADIUS - 0.3 <= p[0] <= 15.0, p
 
@@ -142,6 +141,7 @@ def test_resolve_style_and_spawn():
 
 
 def test_skipped_buildings_ignored_by_spawn():
+    """Tòa nhà xa bị skip không được kéo điểm xuất phát ra xa khu trường."""
     from scene.osm_campus import find_spawn
     near = {"outer": [[0, 0], [40, 0], [40, 20], [0, 20]]}
     far = {"outer": [[900, 900], [940, 900], [940, 920], [900, 920]]}
@@ -152,14 +152,16 @@ def test_skipped_buildings_ignored_by_spawn():
 
 
 def test_raised_block_bridge():
+    """Cầu nối tầng 3-4: tường từ 7.2 m đến 14.4 m, có mặt dưới, người chơi đi bên dưới được."""
     from graphics.extrude import build_walls, build_underside
     base, top = 2 * 3.6, 4 * 3.6
     walls = build_walls(np.array(SQUARE, float), [], top, 10.8, 3.6, base=base)
     v, _ = walls["main"]
     assert np.allclose(v[:, 1].min(), base) and np.allclose(v[:, 1].max(), top)
-    assert abs(v[:, 7].min() - 2.0) < 1e-6 and abs(v[:, 7].max() - 4.0) < 1e-6       
+    assert abs(v[:, 7].min() - 2.0) < 1e-6 and abs(v[:, 7].max() - 4.0) < 1e-6       # 2 tầng = 2 ô texture, thẳng hàng với tòa kế bên
     uv, ui = build_underside(np.array(SQUARE, float), base)
-    assert np.all(tri_normals(uv, ui)[:, 1] < 0) and np.allclose(uv[:, 1], base)       
+    assert np.all(tri_normals(uv, ui)[:, 1] < 0) and np.allclose(uv[:, 1], base)       # mặt dưới hướng xuống
+    # Va chạm: hộp bắt đầu ở y = 7.2 nên không chạm người cao 1.9 m; hộp thường chạm
     raised = _obj(SQUARE, height=top); raised.aabb_min[1] = base
     ground = _obj(SQUARE, height=top)
     y = config.EYE_HEIGHT
@@ -178,17 +180,119 @@ def test_resolve_style_min_levels():
     assert plain["base"] == 0.0
 
 
-def test_osm_surface_geometry():
-    from scene.osm_campus import build_surface_arrays, build_road_arrays, _road_width
+# Road
+def test_road_strip_width_and_normals():
+    from graphics.roads import polyline_strip
+    v, idx = polyline_strip([(0, 0), (20, 0)], 6.0, 0.03, 4.0)
+    assert np.allclose(v[:, 1], 0.03)
+    assert abs(np.ptp(v[:, 2]) - 6.0) < 1e-5                      # bề rộng 6 m theo trục Z
+    assert np.all(tri_normals(v, idx)[:, 1] > 0)                  # mặt trên hướng lên (không bị face culling)
+    assert abs(v[:, 7].max() - 20 / 4.0) < 1e-5                   # v = quãng đường / tile
 
-    vertices, indices = build_surface_arrays(L_SHAPE[::-1], 0.03)
-    assert np.all(tri_normals(vertices, indices)[:, 1] > 0)
-    assert abs(tri_area_sum(vertices[:, [0, 2]], indices.reshape(-1, 3)) - 256.0) < 1e-6
 
-    vertices, indices = build_road_arrays([[0, 0], [10, 0]], 4.0)
-    assert np.all(tri_normals(vertices, indices)[:, 1] > 0)
-    assert np.allclose(vertices[:, 2].min(), -2.0) and np.allclose(vertices[:, 2].max(), 2.0)
-    assert _road_width("residential") == 5.0 and _road_width("unmapped") == 4.0
+def test_road_strip_corner_keeps_width():
+    from graphics.roads import polyline_strip
+    v, idx = polyline_strip([(0, 0), (10, 0), (10, 10)], 4.0, 0.0, 4.0)
+    assert np.all(tri_normals(v, idx)[:, 1] > 0)
+    # Tại góc 90° đỉnh miter cách trục đường 2*sqrt(2)/2 * sqrt(2)... kiểm tra: hai mép cách nhau sqrt(2)*w ở đỉnh góc
+    corner = v[2:4]
+    assert abs(np.hypot(*(corner[0, [0, 2]] - corner[1, [0, 2]])) - 4.0 * np.sqrt(2)) < 1e-4
+    assert np.all(np.isfinite(v))
+
+
+def test_road_strip_closed_ring_and_uturn():
+    from graphics.roads import polyline_strip
+    ring = [(0, 0), (10, 0), (10, 10), (0, 10), (0, 0)]
+    v, idx = polyline_strip(ring, 2.0, 0.0, 4.0, closed=True)
+    assert np.all(np.isfinite(v)) and np.all(tri_normals(v, idx)[:, 1] > 0)
+    v2, _ = polyline_strip([(0, 0), (10, 0), (0, 0.01)], 2.0, 0.0, 4.0)     # quay đầu 180°: miter bị chặn, không nổ
+    assert np.all(np.isfinite(v2)) and np.abs(v2[:, :3]).max() < 100
+
+
+def test_polygon_flat_faces_up():
+    from graphics.roads import polygon_flat
+    v, i = polygon_flat(L_SHAPE, 0.04, 4.0)
+    assert np.all(tri_normals(v, i)[:, 1] > 0)
+    assert abs(sum(abs(signed_area(np.array(v[i.reshape(-1, 3)][:, :, [0, 2]][k]))) for k in range(len(i) // 3))
+               - abs(signed_area(L_SHAPE))) < 1e-3
+
+
+def test_ground_textures_tileable():
+    import graphics.procedural_textures as pt
+    for name, a in (("grass", pt.grass_array()), ("asphalt", pt.asphalt_array())):
+        seam = np.abs(a[:, 0, :3].astype(int) - a[:, -1, :3].astype(int)).mean()
+        seam_v = np.abs(a[0, :, :3].astype(int) - a[-1, :, :3].astype(int)).mean()
+        inner = np.abs(a[:, 50, :3].astype(int) - a[:, 51, :3].astype(int)).mean()
+        assert seam < inner * 1.5 + 2 and seam_v < inner * 1.5 + 2, (name, seam, seam_v, inner)   # mép nối liền như giữa ảnh
+
+
+# ------------------------------------------------------------------ tuyến tour
+GRID = [{"id": "r1", "kind": "service", "points": [[0, 0], [50, 0], [100, 0], [100, 100]]},   # (50,0): giao lộ với r3
+        {"id": "r2", "kind": "service", "points": [[100, 100], [0, 100], [0, 0]]},
+        {"id": "r3", "kind": "footway", "points": [[0, 0], [50, 0], [50, 50]]},          # nhánh phụ tới (50,50)
+        {"id": "big", "kind": "tertiary", "points": [[0, 0], [0, 100]]}]                 # đường lớn: tour không đi
+
+
+def test_graph_junction_snap_and_dijkstra():
+    from scene.tour_route import build_graph, snap_to_graph, shortest_path
+    adj = build_graph(GRID)
+    assert (50.0, 0.0) in adj and set(adj[(0.0, 0.0)]) == {(50.0, 0.0), (0.0, 100.0)}   # đường lớn "tertiary" bị loại; r1 và r3 dùng chung cạnh (0,0)-(50,0)
+    k, d = snap_to_graph(adj, (30.0, 4.0))                                    # chiếu lên cạnh r1, chia đôi cạnh
+    assert k == (30.0, 0.0) and abs(d - 4.0) < 1e-9 and (30.0, 0.0) in adj
+    path = shortest_path(adj, (30.0, 0.0), (50.0, 50.0))
+    assert path[0] == (30.0, 0.0) and path[-1] == (50.0, 50.0)
+    assert abs(sum(np.hypot(a[0] - b[0], a[1] - b[1]) for a, b in zip(path, path[1:])) - 70.0) < 1e-6   # 20 + 50 qua footway
+
+
+def test_resample_and_smooth():
+    from scene.tour_route import resample, smooth
+    sq = np.array([(0, 0), (40, 0), (40, 40), (0, 40)], float)
+    r = resample(sq, 2.0, closed=True)
+    step = np.hypot(*(np.roll(r, -1, 0) - r).T)
+    assert abs(step.mean() - 2.0) < 0.2 and len(r) == 80
+    s = smooth(r, 10.0, 2.0)
+    assert np.hypot(*s[0]) > 1.0                                              # góc (0,0) đã bị bo vào trong
+    assert abs(np.ptp(s[:, 0]) - 40) < 8
+
+
+def test_push_from_obstacles_keeps_clearance():
+    from scene.tour_route import push_from_obstacles, min_clearance
+    wall = rings_to_edges([[(20, -30), (30, -30), (30, 30), (20, 30)]])       # tòa nhà 10x60
+    path = np.array([(x, 0.0) for x in np.arange(0, 50, 1.0)])                # đường đi XUYÊN tòa nhà
+    out = push_from_obstacles(path, [wall], 2.0)
+    assert min_clearance(out, [wall]) > 1.7, min_clearance(out, [wall])
+    far = np.array([(0.0, 50.0), (5.0, 50.0)])
+    assert np.allclose(push_from_obstacles(far, [wall], 2.0), far, atol=1e-6)  # điểm đã đủ xa: giữ nguyên
+
+
+def test_build_tour_toy():
+    from scene.tour_route import build_tour
+    building = rings_to_edges([[(40, 40), (60, 40), (60, 60), (40, 60)]])
+    spec = {"clearance": 2.0, "corner_smoothing": 6.0, "stops": [
+        {"name": "A", "snap": [10, 0]}, {"name": "B", "snap": [100, 50]},
+        {"name": "Sân", "free": [[80, 50], [60, 80], [80, 90]]}, {"name": "C", "snap": [50, 100]}]}
+    tour = build_tour(GRID, spec, [building], eye_height=1.7)
+    wp = np.array(tour["waypoints"])
+    assert np.allclose(wp[:, 1], 1.7) and len(wp) >= 20
+    assert tour["clearance"] > 1.5 and not tour["warnings"]
+    prog = [p for _, p in tour["stops"]]
+    assert prog == sorted(prog) and 0.0 <= prog[0] < prog[-1] < 1.0           # điểm dừng theo đúng thứ tự dọc tuyến
+    assert 300 < tour["length"] < 450
+
+
+def test_tour_waypoints_compatible_with_catmull_rom():
+    """Waypoint tạo ra phải dùng được với CatmullRomPath (khép kín) và đi với tốc độ đều."""
+    from scene.tour_route import build_tour
+    spec = {"stops": [{"snap": [0, 0]}, {"snap": [100, 0]}, {"snap": [100, 100]}, {"snap": [0, 100]}]}
+    wp = build_tour(GRID, spec, [], 1.7)["waypoints"]
+    try:
+        from scene.path import CatmullRomPath
+    except ImportError:
+        return                                                               # bản Phase 3 chưa có path.py: bỏ qua
+    path = CatmullRomPath(wp, closed=True)
+    pts = np.array([path.point_at_distance(i * 2.0) for i in range(int(path.total_length / 2))])
+    steps = np.hypot(*(pts[1:] - pts[:-1])[:, [0, 2]].T)
+    assert steps.max() < 2.2 and steps.min() > 1.7
 
 
 if __name__ == "__main__":

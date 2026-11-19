@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def rings_to_edges(rings):
     edges = []
     for ring in rings:
@@ -33,3 +32,16 @@ def dist_to_edges(px, pz, edges):
 
 def circle_hits_rings(px, pz, radius, edges):
     return point_in_edges(px, pz, edges) or dist_to_edges(px, pz, edges) < radius
+
+
+def nearest_on_edges(px, pz, edges):
+    if len(edges) == 0:
+        return np.inf, px, pz
+    x0, z0, x1, z1 = edges.T
+    abx, abz = x1 - x0, z1 - z0
+    denom = np.maximum(abx * abx + abz * abz, 1e-12)
+    t = np.clip(((px - x0) * abx + (pz - z0) * abz) / denom, 0.0, 1.0)
+    cx, cz = x0 + t * abx, z0 + t * abz
+    d2 = (px - cx) ** 2 + (pz - cz) ** 2
+    k = int(np.argmin(d2))
+    return float(np.sqrt(d2[k])), float(cx[k]), float(cz[k])

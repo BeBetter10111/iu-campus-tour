@@ -5,7 +5,7 @@ from scene.geometry2d import circle_hits_rings
 
 
 class CollisionWorld:
-    MAX_STEP = 0.25   # Mỗi bước di chuyển tối đa (m). Chia nhỏ để không xuyên tường mỏng.
+    MAX_STEP = 0.25   
 
     def __init__(self, objects):
         self.collidable_objects = [o for o in objects if getattr(o, "collidable", False)]
@@ -30,7 +30,7 @@ class CollisionWorld:
         for i in np.flatnonzero(overlap):
             edges = getattr(self.collidable_objects[i], "footprint_edges", None)
             if edges is None:
-                return True                                    # Chỉ có AABB -> coi như va chạm
+                return True                                   
             if circle_hits_rings(float(pos[0]), float(pos[2]), config.PLAYER_RADIUS, edges):
                 return True
         return False
@@ -46,7 +46,7 @@ class CollisionWorld:
         step = delta / n
         cur = pos.copy()
         for _ in range(n):
-            for axis in (0, 2, 1):               # X, Z, rồi Y (Y chỉ khác 0 khi fly_mode)
+            for axis in (0, 2, 1):               
                 if step[axis] == 0.0:
                     continue
                 trial = cur.copy()
