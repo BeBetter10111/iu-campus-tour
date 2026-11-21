@@ -1,17 +1,30 @@
 import numpy as np
 
 import config
-from scene.geometry2d import circle_hits_rings
+from scene.geometry2d import circle_hits_rings, dist_to_edges
 
 
 class CollisionWorld:
     MAX_STEP = 0.25   
 
     def __init__(self, objects):
-        self.collidable_objects = [o for o in objects if getattr(o, "collidable", False)]
-        if self.collidable_objects:
-            self.aabb_mins = np.array([o.aabb_min for o in self.collidable_objects], dtype=np.float32)
-            self.aabb_maxs = np.array([o.aabb_max for o in self.collidable_objects], dtype=np.float32)
+        mins, maxs, owners = [], [], []
+        for o in objects:
+            if getattr(o, "collidable", False):
+                mins.append(np.asarray(o.aabb_min, np.float32))
+                maxs.append(np.asarray(o.aabb_max, np.float32))
+                owners.append(o)
+            boxes = getattr(o, "collider_boxes", None)
+            if boxes is not None and len(boxes):
+                b = np.asarray(boxes, np.float32).reshape(-1, 6)
+                mins.extend(b[:, :3])
+                maxs.extend(b[:, 3:])
+                owners.extend([None] * len(b))                    
+        self.owners = owners
+        self.collidable_objects = [o for o in owners if o is not None]
+        if mins:
+            self.aabb_mins = np.array(mins, dtype=np.float32)
+            self.aabb_maxs = np.array(maxs, dtype=np.float32)
         else:
             self.aabb_mins = np.zeros((0, 3), dtype=np.float32)
             self.aabb_maxs = np.zeros((0, 3), dtype=np.float32)
@@ -27,11 +40,18 @@ class CollisionWorld:
             return False
         p_lo, p_hi = self._player_box(pos)
         overlap = np.all((p_lo < self.aabb_maxs) & (p_hi > self.aabb_mins), axis=1)
+        px, pz, r = float(pos[0]), float(pos[2]), config.PLAYER_RADIUS
         for i in np.flatnonzero(overlap):
-            edges = getattr(self.collidable_objects[i], "footprint_edges", None)
-            if edges is None:
-                return True                                   
-            if circle_hits_rings(float(pos[0]), float(pos[2]), config.PLAYER_RADIUS, edges):
+            owner = self.owners[i]
+            if owner is None:
+                return True                                       
+            walls = getattr(owner, "wall_edges", None)
+            if walls is not None:
+                if len(walls) and dist_to_edges(px, pz, walls) < r:
+                    return True                                   
+                continue
+            edges = getattr(owner, "footprint_edges", None)
+            if edges is None or circle_hits_rings(px, pz, r, edges):
                 return True
         return False
 

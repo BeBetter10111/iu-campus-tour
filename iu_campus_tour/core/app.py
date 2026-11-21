@@ -2,7 +2,6 @@
 
 from enum import Enum
 
-import numpy as np
 import pygame
 from OpenGL.GL import (
     glClearColor, glClear, glEnable,
@@ -52,14 +51,17 @@ class App:
 
         # Thế giới
         self.scene = build_campus()
+        # --- OSM: điểm xuất phát lấy từ cảnh (nếu cảnh có), không thì dùng hằng số ở đầu class ---
         self.SPAWN_POS = getattr(self.scene, "spawn_pos", self.SPAWN_POS)
-        self.SPAWN_YAW = getattr(self.scene, "spawn_yaw", self.SPAWN_YAW)        
+        self.SPAWN_YAW = getattr(self.scene, "spawn_yaw", self.SPAWN_YAW)
         self.skybox = Skybox()
         self.camera = FirstPersonCamera(position=self.SPAWN_POS, yaw=self.SPAWN_YAW)
         self.collision = CollisionWorld(self.scene.objects)
 
         # Tour: path đóng kín qua các waypoint trong config
-        self.tour = TourController(CatmullRomPath(config.TOUR_WAYPOINTS, closed=True))
+        # --- OSM: tuyến tour tự động theo đường trong dữ liệu; không có thì dùng config.TOUR_WAYPOINTS ---
+        tour_points = getattr(self.scene, "tour_waypoints", None) or config.TOUR_WAYPOINTS
+        self.tour = TourController(CatmullRomPath(tour_points, closed=True))
 
         # UI: texture menu tạo 1 lần; texture HUD chỉ tạo lại khi % thay đổi
         self.overlay = Overlay()
@@ -69,9 +71,13 @@ class App:
             "[1]  Tự do khám phá",
             "[2]  Tham quan tự động",
             "[ESC]  Thoát",
-        ])
+        ], font_size=30, min_size=(560, 300))
         self.hud_tex = None
-        self._hud_percent = -1
+        self._hud_key = None            # (percent, paused, speed): đổi -> tạo lại texture HUD
+        self.free_hint_tex = self.overlay.make_text_texture([
+            "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
+            "M menu   B Phong/Blinn   N bóng   F2 debug   Phím mũi tên: mặt trời",
+        ], title=False, font_size=20, pad=14)
 
         # Tùy chọn hiển thị
         self.use_blinn = False
@@ -119,7 +125,7 @@ class App:
         pygame.mouse.set_visible(not enabled)
         pygame.mouse.get_rel()               # Xả delta tích lũy để khung đầu không bị giật
 
-    # vòng lặp
+    # ------------------------------------------------------------------- vòng lặp
     def run(self):
         while self.running:
             dt = self.timer.tick()
@@ -132,7 +138,7 @@ class App:
                     f"{config.WINDOW_TITLE} | {self.mode.name} | {self.timer.fps:.0f} FPS")
         self.window.close()
 
-    # sự kiện
+    # -------------------------------------------------------------------- sự kiện
     def _handle_events(self):
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
@@ -197,7 +203,9 @@ class App:
             # Camera chỉ TÍNH độ dời; CollisionWorld quyết định đi được bao xa (trượt dọc tường)
             delta = self.camera.get_move_delta(keys, dt)
             self.camera.position = self.collision.move(self.camera.position, delta)
-            if not self.camera.fly_mode:
+            if self.camera.fly_mode:
+                self.camera.position[1] = max(self.camera.position[1], 0.3)   # Không chui xuống đất
+            else:
                 self.camera.position[1] = config.EYE_HEIGHT
 
         elif self.mode == Mode.TOUR:
@@ -258,19 +266,24 @@ class App:
         self._render_ui()
 
     def _render_ui(self):
+        w, h = self.window.width, self.window.height
+
         if self.mode == Mode.MENU:
-            # Hộp giữa màn hình: rộng 1.0, cao 0.8 (đơn vị NDC, gốc ở góc dưới-trái của hộp)
-            self.overlay.draw(self.menu_tex, (-0.5, -0.4, 1.0, 0.8))
+            self.overlay.draw_at(self.menu_tex, w, h, anchor="center")
+
+        elif self.mode == Mode.FREE:
+            self.overlay.draw_at(self.free_hint_tex, w, h, anchor="bottomleft")
 
         elif self.mode == Mode.TOUR:
-            percent = int(self.tour.progress() * 100)
-            if percent != self._hud_percent:     # Chỉ tạo lại texture khi chữ thực sự đổi
-                self._hud_percent = percent
+            key = (int(self.tour.progress() * 100), self.tour.paused, round(self.tour.speed, 1))
+            if key != self._hud_key:          # Chỉ tạo lại texture khi chữ thực sự đổi
+                self._hud_key = key
                 if self.hud_tex is not None:
-                    self.hud_tex.delete()        # Tránh rò rỉ texture trên GPU
-                state = "TẠM DỪNG" if self.tour.paused else "ĐANG CHẠY"
+                    self.hud_tex.delete()     # Tránh rò rỉ texture trên GPU
+                percent, paused, speed = key
+                state = "TẠM DỪNG" if paused else "ĐANG CHẠY"
                 self.hud_tex = self.overlay.make_text_texture([
-                    f"Tham quan: {percent}%  ({state})",
+                    f"Tham quan: {percent}%  ({state})  {speed:.1f} m/s",
                     "SPACE tạm dừng   +/- tốc độ   M menu",
-                ], size=(640, 120))
-            self.overlay.draw(self.hud_tex, (-0.98, 0.80, 1.0, 0.18))
+                ], title=False, font_size=20, pad=14)
+            self.overlay.draw_at(self.hud_tex, w, h, anchor="topleft")

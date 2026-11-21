@@ -4,8 +4,8 @@ from PIL import Image, ImageDraw
 import config
 from graphics.texture import Texture
 
-FLOOR_H = getattr(config, "FLOOR_HEIGHT", 3.6)   
-TILE_W = 3 * FLOOR_H                             
+FLOOR_H = getattr(config, "FLOOR_HEIGHT", 3.6)   # m
+TILE_W = 3 * FLOOR_H                             # m: 3 cửa sổ mỗi ô
 PX_PER_M = 40
 
 WHITE = (240, 240, 236)
@@ -35,7 +35,7 @@ def _window(d, cx, cy, w, h, glass=GLASS, frame=FRAME, surround=None, surround_p
 
 def _make(kind):
     W, H = _px(TILE_W), _px(FLOOR_H)
-    if kind == "maroon":                     # Tường đỏ đô, cửa sổ viền trắng nổi 
+    if kind == "maroon":                     # Tường đỏ đô, cửa sổ viền trắng nổi (khối đỏ trong ảnh)
         img = Image.new("RGB", (W, H), MAROON)
         d = ImageDraw.Draw(img)
         for i in range(3):
@@ -52,6 +52,23 @@ def _make(kind):
         d.rectangle((0, H - _px(0.2), W, H), fill=(120, 120, 116))
     elif kind == "roof":
         img = Image.new("RGB", (_px(6), _px(6)), ROOF)
+    elif kind == "white_plain":              # Tầng trệt: tường trắng toàn bộ, không cửa sổ
+        img = Image.new("RGB", (W, H), WHITE)
+    elif kind == "interior_wall":            # Tường trong nhà: trắng nhạt, chân tường (len) xám ấm
+        img = Image.new("RGB", (W, H), (238, 236, 230))
+        d = ImageDraw.Draw(img)
+        d.rectangle((0, H - _px(0.14), W, H), fill=(196, 192, 184))          # (hàng cuối ảnh = chân tường, vì texture lật dọc)
+    elif kind == "interior_ceiling":
+        img = Image.new("RGB", (_px(6), _px(6)), (246, 245, 242))
+    elif kind == "interior_floor":           # Sàn gạch xám sáng, ô 0,5 m (4x4 ô trên 2 m)
+        img = Image.new("RGB", (_px(2), _px(2)), (204, 202, 196))
+        d = ImageDraw.Draw(img)
+        step = _px(2) // 4
+        for k in range(4):
+            d.line((k * step, 0, k * step, _px(2)), fill=(166, 164, 158), width=2)
+            d.line((0, k * step, _px(2), k * step), fill=(166, 164, 158), width=2)
+    elif kind == "fence":                    # Rào thấp: thép sơn xám xanh
+        img = Image.new("RGB", (16, 16), (88, 94, 102))
     else:                                    # "plain": tường be, cửa sổ nhỏ (công trình chưa có ảnh)
         img = Image.new("RGB", (W, H), BEIGE)
         d = ImageDraw.Draw(img)
@@ -187,3 +204,47 @@ def ground_texture(kind):
     tex = Texture(arr)
     _ground_cache[kind] = tex
     return tex
+
+
+
+# ================================================================= Cây xanh
+FOLIAGE_SHADES = 8      # Số màu lá trong bảng màu (mỗi cây chọn một cột)
+_FOLIAGE_RGB = [(52, 104, 44), (64, 118, 48), (78, 132, 54), (58, 110, 62),
+                (88, 138, 58), (46, 94, 52), (72, 124, 66), (96, 142, 62)]
+_veg_cache = {}
+
+
+def foliage_array(size=128):
+    """Bảng màu lá: FOLIAGE_SHADES cột, mỗi cột một sắc xanh; trục dọc tối (dưới tán) -> sáng (đỉnh tán) + nhiễu hạt lá."""
+    rng = np.random.default_rng(21)
+    img = np.zeros((size, size, 3))
+    col_w = size // FOLIAGE_SHADES
+    vv = np.linspace(0.62, 1.12, size)[:, None]                      # hàng 0 = v 0 = dưới
+    for k, base in enumerate(_FOLIAGE_RGB):
+        block = np.array(base, float)[None, None, :] * vv[:, :, None] * np.ones((1, col_w, 1))
+        block += rng.normal(0, 5, block.shape)
+        img[:, k * col_w:(k + 1) * col_w] = block
+    return _to_rgba(img)
+
+
+def trunk_array(size=32):
+    rng = np.random.default_rng(22)
+    vv = np.linspace(0.75, 1.1, size)[:, None, None]
+    rgb = np.array([104, 76, 52], float)[None, None, :] * vv * np.ones((1, size, 1))
+    return _to_rgba(rgb + rng.normal(0, 4, rgb.shape))
+
+
+def vegetation_textures():
+    """(texture_lá, texture_thân_cây), có cache. Có thể thay bằng ảnh thật: assets/textures/veg_foliage.png, veg_trunk.png."""
+    if "v" not in _veg_cache:
+        out = []
+        for name, fn in (("foliage", foliage_array), ("trunk", trunk_array)):
+            arr = None
+            for ext in (".png", ".jpg"):
+                path = config.TEXTURE_DIR / f"veg_{name}{ext}"
+                if path.exists():
+                    arr = np.asarray(Image.open(path).convert("RGBA").transpose(Image.Transpose.FLIP_TOP_BOTTOM))
+                    break
+            out.append(Texture(arr if arr is not None else fn()))
+        _veg_cache["v"] = tuple(out)
+    return _veg_cache["v"]

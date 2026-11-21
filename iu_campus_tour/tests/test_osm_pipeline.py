@@ -1,3 +1,5 @@
+"""Kiểm thử đường ống OSM (không cần GPU):  python tests/test_osm_pipeline.py"""
+
 import os
 import sys
 import types
@@ -180,7 +182,7 @@ def test_resolve_style_min_levels():
     assert plain["base"] == 0.0
 
 
-# Road
+# ------------------------------------------------------------ đường và lối đi
 def test_road_strip_width_and_normals():
     from graphics.roads import polyline_strip
     v, idx = polyline_strip([(0, 0), (20, 0)], 6.0, 0.03, 4.0)
@@ -293,6 +295,152 @@ def test_tour_waypoints_compatible_with_catmull_rom():
     pts = np.array([path.point_at_distance(i * 2.0) for i in range(int(path.total_length / 2))])
     steps = np.hypot(*(pts[1:] - pts[:-1])[:, [0, 2]].T)
     assert steps.max() < 2.2 and steps.min() > 1.7
+
+
+# ------------------------------------------ tầng trệt, cửa ra vào, nội thất
+def _wall_quads(v, idx):
+    """Với mỗi hình chữ nhật (4 đỉnh, 2 tam giác) trả về (tâm, pháp_tuyến_đỉnh, pháp_tuyến_hình_học)."""
+    out = []
+    ng = tri_normals(v, idx)
+    for q in range(len(idx) // 6):
+        vs = v[q * 4:(q + 1) * 4]
+        out.append((vs[:, :3].mean(axis=0), vs[0, 3:6], ng[q * 2], ng[q * 2 + 1]))
+    return out
+
+
+def test_ground_floor_split_and_doors():
+    from graphics.extrude import build_walls_ground
+    g = build_walls_ground(np.array(SQUARE, float), 25.2, 10.8, 3.6, "maroon", "white_plain",
+                           doors=[{"at": [5.0, -0.4], "width": 2.6}], interior=True)
+    assert set(g["walls"]) == {"white_plain", "maroon"}                     # tầng trệt trắng, các tầng trên đỏ đô
+    vu, _ = g["walls"]["maroon"]
+    assert abs(vu[:, 1].min() - 3.6) < 1e-6 and abs(vu[:, 7].min() - 1.0) < 1e-6   # tầng trên bắt đầu từ y = 3.6, v = 1 (thẳng hàng tầng)
+    d = g["doors"][0]
+    assert d["ok"] and abs(d["width"] - 2.6) < 1e-6 and abs(d["snap_dist"] - 0.4) < 1e-6
+    assert abs(d["at"][0] - 5.0) < 1e-6 and abs(d["at"][1]) < 1e-6          # cửa đặt giữa, nằm trên cạnh z = 0
+    total = sum(np.hypot(e[2] - e[0], e[3] - e[1]) for e in g["wall_edges"])
+    assert abs(total - (40.0 - 2.6)) < 1e-6                                 # chu vi trừ đúng bề rộng ô cửa
+    # lanh tô phía trên cửa: có mặt tường ở độ cao 2.7..3.6 ngay trên ô cửa
+    vg, _ = g["walls"]["white_plain"]
+    assert np.any((np.abs(vg[:, 1] - 2.7) < 1e-6)) and np.any(np.abs(vg[:, 1] - 3.6) < 1e-6)
+
+
+def test_interior_faces_point_inward_and_winding():
+    from graphics.extrude import build_walls_ground
+    edges = rings_to_edges([L_SHAPE])
+    g = build_walls_ground(np.array(L_SHAPE, float), 10.8, 10.8, 3.6, "maroon", "white_plain",
+                           doors=[{"at": [10.0, 0.0], "width": 2.6}], interior=True)
+    iv, ii = g["interior"]["walls"]
+    for mid, nrm, n1, n2 in _wall_quads(iv, ii):
+        assert np.dot(n1, nrm) > 0 and np.dot(n2, nrm) > 0                    # thứ tự đỉnh khớp pháp tuyến lưu trong đỉnh
+        inside = mid[[0, 2]] + 0.05 * nrm[[0, 2]]
+        outside = mid[[0, 2]] - 0.05 * nrm[[0, 2]]
+        assert point_in_edges(inside[0], inside[1], edges) and not point_in_edges(outside[0], outside[1], edges)  # mặt trong hướng VÀO phòng
+    fv, fi = g["interior"]["floor"]
+    cv, ci = g["interior"]["ceiling"]
+    assert np.all(tri_normals(fv, fi)[:, 1] > 0) and np.all(tri_normals(cv, ci)[:, 1] < 0)   # sàn hướng lên, trần hướng xuống
+    ev, ei = g["walls"]["white_plain"]
+    for mid, nrm, n1, n2 in _wall_quads(ev, ei):                              # mặt ngoài tầng trệt hướng RA
+        out = mid[[0, 2]] + 0.05 * nrm[[0, 2]]
+        assert not point_in_edges(out[0], out[1], edges) and np.dot(n1, nrm) > 0
+
+
+def test_door_too_far_is_reported():
+    from graphics.extrude import build_walls_ground
+    g = build_walls_ground(np.array(SQUARE, float), 7.2, 10.8, 3.6, "maroon", "white_plain",
+                           doors=[{"at": [5, 30], "width": 2.6}, {"at": [0.5, 5.0], "width": 50.0}])
+    assert g["doors"][0]["ok"] is False                                        # cách tường 20 m
+    assert g["doors"][1]["ok"] and g["doors"][1]["width"] < 10                  # bề rộng bị chặn bởi độ dài cạnh
+
+
+def test_enterable_collision_gap_inside_and_walls():
+    from graphics.extrude import build_walls_ground
+    g = build_walls_ground(np.array(SQUARE, float), 7.2, 10.8, 3.6, "maroon", "white_plain",
+                           doors=[{"at": [5.0, 0.0], "width": 2.6}], interior=True)
+    obj = types.SimpleNamespace(collidable=True, aabb_min=np.array([0, 0, 0], np.float32),
+                                aabb_max=np.array([10, 7.2, 10], np.float32), wall_edges=g["wall_edges"])
+    w = CollisionWorld([obj]); y = config.EYE_HEIGHT
+    assert not w.collides(np.array([5.0, y, 5.0]))                             # bên trong đi lại được
+    assert w.collides(np.array([2.0, y, 0.1]))                                 # sát tường (cách cửa) bị chặn
+    assert not w.collides(np.array([5.0, y, 0.0]))                             # đứng giữa ô cửa
+    p = w.move(np.array([5.0, y, -3.0], np.float32), np.array([0, 0, 8.0], np.float32))
+    assert p[2] > 4.9                                                          # đi thẳng qua cửa vào trong (đi đủ 8 m: tới z = 5)
+    p = w.move(np.array([2.0, y, -3.0], np.float32), np.array([0, 0, 8.0], np.float32))
+    assert p[2] < 0.0                                                          # đi vào chỗ không có cửa: bị tường chặn
+
+
+def test_collider_boxes_block_and_pass_over():
+    box = types.SimpleNamespace(collidable=False, collider_boxes=np.array([[4.8, 0.0, 4.8, 5.2, 3.0, 5.2]], np.float32))
+    w = CollisionWorld([box]); y = config.EYE_HEIGHT
+    assert w.collides(np.array([5.0, y, 5.0])) and not w.collides(np.array([8.0, y, 5.0]))
+    low = types.SimpleNamespace(collidable=False, collider_boxes=np.array([[0, 0, 0, 5, 0.45, 5]], np.float32))
+    assert CollisionWorld([low]).collides(np.array([2.0, y, 2.0]))             # rào thấp vẫn chặn (chân người ở y = 0)
+
+
+def test_style_door_merge_and_extra_buildings():
+    from scene.osm_campus import resolve_style, _norm, _manual_building
+    ov = {"by_name": {_norm("A1"): {"levels": 7, "doors": [{"at": [0, 0]}], "ground_facade": "white_plain", "enterable": True}},
+          "by_id": {"way/1": {"doors": [{"at": [1, 1]}]}},
+          "connect_doors": {"way/1": [{"at": [2, 2], "width": 4}]}, "extra_buildings": []}
+    b = {"id": "way/1", "name": "A1", "kind": "university", "levels": None, "height": None,
+         "outer": [[0, 0], [40, 0], [40, 20], [0, 20]]}
+    st = resolve_style(b, ov)
+    assert len(st["doors"]) == 3 and st["enterable"] and st["ground_facade"] == "white_plain" and st["levels"] == 7
+    mb = _manual_building(0, {"id": "manual/x", "name": "Căn tin", "outer": SQUARE})
+    assert mb["id"] == "manual/x" and resolve_style(mb, ov)["levels"] == 2    # không có số tầng -> mặc định 2
+
+
+# ------------------------------------------------------------ cây và rào
+def test_plant_geometry_outward_and_boxes():
+    from graphics.vegetation import build_plants, sphere_part, TRUNK_BOX_HEIGHT
+    v, i = sphere_part(0, 0, 0, 1.0)
+    tri = v[i.reshape(-1, 3)]
+    geo = np.cross(tri[:, 1, :3] - tri[:, 0, :3], tri[:, 2, :3] - tri[:, 0, :3])
+    assert np.all((geo * tri[:, 0, 3:6]).sum(axis=1) >= -1e-9)               # mặt cầu hướng ra ngoài
+    trunk, canopy, boxes = build_plants([(0, 0, "tree"), (10, 0, "small"), (20, 0, "shrub")], seed=3)
+    assert trunk is not None and canopy is not None and len(boxes) == 2        # bụi thấp không có hộp va chạm
+    assert np.allclose(boxes[:, 4], TRUNK_BOX_HEIGHT) and canopy[0][:, 7].min() >= 0 and canopy[0][:, 7].max() <= 1
+
+
+def test_vegetation_respects_constraints():
+    from scene.landscape import Constraints, generate_vegetation, dist_points_segments, points_in_edges
+    bld = rings_to_edges([[(0, 0), (40, 0), (40, 20), (0, 20)]])
+    roads = [{"kind": "service", "points": [[-60, 40], [100, 40]]}]
+    styles = {"service": ("asphalt", 5.5, 0.04, 4.0, False)}
+    segs = np.array([[-60, 40, 100, 40, 2.75]], float)
+    door = (20.0, 20.0, 0.0, 1.0)                                              # cửa ở mặt Nam, hướng ra +Z
+    tour = np.array([[x, 30.0] for x in range(-20, 60, 2)], float)
+    cons = Constraints([bld], segs, [], [door], tour, (10.0, 60.0))
+    spec = {"seed": 5, "tree_zones": [{"name": "z", "polygon": [[2, 22], [38, 22], [38, 36], [2, 36]], "density": 6.0}],
+            "street_trees": {"enabled": True, "spacing": 10.0, "margin": 40.0, "max": 40},
+            "perimeter": {"enabled": True, "count": 60, "margin": 40.0}}
+    plants, stats = generate_vegetation(spec, cons, roads, styles, (0, 0, 40, 20))
+    assert len(plants) > 20 and stats.get("perimeter", 0) > 0
+    P = np.array([[x, z] for x, z, k in plants])
+    assert not points_in_edges(P, bld).any()                                   # không có cây trong tòa nhà
+    assert (dist_points_segments(P, bld) >= 0.79).all()                        # không sát tường
+    assert (np.abs(P[:, 1] - 40) >= 2.75).all()                                # không đè lên đường
+    assert (np.hypot(*(P - np.array([20.0, 20.0])).T) >= 3.2).all()            # không ở ngay cửa
+    assert not ((np.abs(P[:, 0] - 20.0) < 2.0) & (P[:, 1] > 19.5) & (P[:, 1] < 29)).any()   # không chặn lối đi từ cửa ra
+    assert (np.hypot(*(P - np.array([10.0, 60.0])).T) >= 6.0).all()            # không sát điểm xuất phát
+    zone_pts = P[(P[:, 0] > 2) & (P[:, 0] < 38) & (P[:, 1] > 22) & (P[:, 1] < 36)]
+    assert len(zone_pts) >= 8                                                  # vùng bắt buộc có nhiều cây
+
+
+def test_fence_gate_gap_and_collision_boxes():
+    from graphics.fence import fence_for_polygon, FENCE_HEIGHT
+    ring = [(0, 0), (20, 0), (20, 10), (0, 10)]
+    (v, i), boxes, rep = fence_for_polygon(ring, gates=[{"at": [10, 0.2], "width": 4.0}])
+    assert rep[0]["ok"] and np.all(boxes[:, 4] <= FENCE_HEIGHT + 1e-6) and FENCE_HEIGHT < 0.6    # thấp hơn đầu gối
+    assert len(v) > 0 and len(i) % 3 == 0
+    # cổng ở (10, 0) rộng 4 m: không hộp nào phủ đoạn x 8.2..11.8 trên cạnh z = 0
+    cover = [b for b in boxes if b[2] < 0.5 and b[5] < 0.5 and b[0] < 11.8 and b[3] > 8.2]
+    assert not cover
+    w = CollisionWorld([types.SimpleNamespace(collidable=False, collider_boxes=boxes)]); y = config.EYE_HEIGHT
+    assert w.collides(np.array([3.0, y, 0.0])) and not w.collides(np.array([10.0, y, 0.0]))
+    assert (v[:, 1].max() <= FENCE_HEIGHT + 1e-6)
+    _, boxes2, rep2 = fence_for_polygon(ring, gates=[{"at": [100, 100], "width": 4.0}])
+    assert rep2[0]["ok"] is False
 
 
 if __name__ == "__main__":

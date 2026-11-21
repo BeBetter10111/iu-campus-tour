@@ -32,10 +32,12 @@ def build_campus():
             from scene.tour_route import load_tour_spec
             ground_photo = config.TEXTURE_DIR / "ground.jpg"          # có ảnh cỏ thật thì dùng, không thì cỏ sinh bằng code
             tour_path = DATA_DIR / "tour.json"
+            land_path = DATA_DIR / "landscape.json"                    # cây xanh, bãi xe, bề rộng đường
             return build_campus_from_osm(load_json(data_path),
                                          load_overrides(DATA_DIR / "building_overrides.json"),
                                          ground_texture=Texture.from_file(ground_photo) if ground_photo.exists() else None,
-                                         tour_spec=load_tour_spec(tour_path) if tour_path.exists() else None)
+                                         tour_spec=load_tour_spec(tour_path) if tour_path.exists() else None,
+                                         landscape=load_json(land_path) if land_path.exists() else None)
         except Exception:
             print("[Campus] Lỗi khi nạp dữ liệu OSM -> dùng cảnh thử nghiệm:")
             traceback.print_exc()

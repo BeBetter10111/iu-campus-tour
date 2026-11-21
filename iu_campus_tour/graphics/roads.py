@@ -2,7 +2,8 @@ import numpy as np
 
 from graphics.extrude import triangulate
 
-MITER_LIMIT = 2.0     
+MITER_LIMIT = 2.0    
+
 
 def _dedupe(points, tol=0.05):
     pts = []
@@ -23,7 +24,8 @@ def polyline_strip(points, width, y, tile, full_width=False, closed=False):
     seg = (np.roll(P, -1, axis=0) - P) if closed else (P[1:] - P[:-1])
     length = np.maximum(np.hypot(seg[:, 0], seg[:, 1]), 1e-9)
     d = seg / length[:, None]
-    nrm = np.stack([-d[:, 1], d[:, 0]], axis=1)                  
+    nrm = np.stack([-d[:, 1], d[:, 0]], axis=1)                  # pháp tuyến trái của từng đoạn
+
     miter = np.zeros((n, 2))
     for i in range(n):
         if closed:
@@ -54,12 +56,13 @@ def polyline_strip(points, width, y, tile, full_width=False, closed=False):
 
     idx = []
     for i in range(count - 1):
-        a, b, c, e = 2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 3        
+        a, b, c, e = 2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 3        # L_i, R_i, L_{i+1}, R_{i+1}
+        idx += [a, b, c, b, e, c]
     idx = np.array(idx, np.uint32).reshape(-1, 3)
 
     tri = verts[idx][:, :, :3]
     ny = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])[:, 1]
-    if np.median(ny) < 0:
+    if len(ny) and np.median(ny) < 0:
         idx = idx[:, [0, 2, 1]]
     return verts, idx.reshape(-1)
 

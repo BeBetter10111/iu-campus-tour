@@ -19,6 +19,7 @@ class Texture:
     def __init__(self, data):
         data = np.ascontiguousarray(data, dtype=np.uint8)
         h, w = data.shape[:2]
+        self.width, self.height = w, h
 
         self.id = glGenTextures(1)
         glBindTexture(GL_TEXTURE_2D, self.id)
