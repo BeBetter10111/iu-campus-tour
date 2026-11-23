@@ -5,8 +5,8 @@ import numpy as np
 from graphics.roads import merge_meshes
 
 NSHADES = 8
-TREE_KINDS = {"tree": (5.5, 9.0), "small": (3.0, 4.5), "shrub": (0.8, 1.6)}     # khoảng chiều cao (m)
-TRUNK_BOX_HALF = 0.22                                                          # nửa cạnh hộp va chạm thân cây (m)
+TREE_KINDS = {"tree": (5.5, 9.0), "small": (3.0, 4.5), "shrub": (0.8, 1.6)}
+TRUNK_BOX_HALF = 0.22
 TRUNK_BOX_HEIGHT = 3.0
 
 
@@ -69,7 +69,7 @@ def make_plant(x, z, kind, rng):
     R = 0.30 * H
     trunk = trunk_part(x, z, trunk_h + 0.4 * R, 0.17 + 0.018 * H, 0.10 + 0.010 * H)
     parts = [sphere_part(x, trunk_h + 0.6 * R, z, R, sy=0.85, shade=shade)]
-    for _ in range(2):                                           # hai khối phụ lệch hai bên cho tán không tròn đều
+    for _ in range(2):
         ang = float(rng.uniform(0, 2 * math.pi))
         parts.append(sphere_part(x + 0.55 * R * math.cos(ang), trunk_h + 0.3 * R, z + 0.55 * R * math.sin(ang),
                                  0.7 * R, sy=0.85, shade=shade + int(rng.integers(-1, 2))))

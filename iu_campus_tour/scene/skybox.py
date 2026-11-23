@@ -1,4 +1,4 @@
-"""Skybox: cube bao quanh, luôn ở xa vô cực và đi theo camera."""
+"""Skybox that surrounds and follows the camera."""
 
 from OpenGL.GL import (glDepthFunc, glDisable, glEnable,
                        GL_LEQUAL, GL_LESS, GL_CULL_FACE)

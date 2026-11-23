@@ -45,7 +45,12 @@
           ],
           "width": 4.5
         }
-      ]
+      ],
+      "roof": {
+        "height": 3.2,
+        "thickness": 0.25,
+        "column_spacing": 8.0
+      }
     },
     {
       "name": "Bai xe Dong-Bac",
@@ -83,7 +88,12 @@
           ],
           "width": 4.5
         }
-      ]
+      ],
+      "roof": {
+        "height": 3.2,
+        "thickness": 0.25,
+        "column_spacing": 8.0
+      }
     }
   ],
   "tree_zones": [
@@ -191,5 +201,48 @@
       "small": 0.3
     },
     "wall_clearance": 5.0
-  }
+  },
+  "door_paths": {
+    "enabled": true,
+    "extra_width": 2.5,
+    "max_length": 30.0,
+    "default_length": 8.0
+  },
+  "paved_areas": [
+    {
+      "name": "Loi giua san trong (giua hai lan co)",
+      "polygon": [
+        [
+          -84.8,
+          -11.5
+        ],
+        [
+          7.5,
+          -11.5
+        ],
+        [
+          7.5,
+          -2.0
+        ],
+        [
+          -84.8,
+          -2.0
+        ]
+      ],
+      "surface": "paving",
+      "benches": {
+        "count": 5,
+        "min_spacing": 10.0,
+        "seed": 7,
+        "door_clearance": 4.0,
+        "avoid": [
+          [
+            -29.0,
+            -6.75,
+            5.0
+          ]
+        ]
+      }
+    }
+  ]
 }

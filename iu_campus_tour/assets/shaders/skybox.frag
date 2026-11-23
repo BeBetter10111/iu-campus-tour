@@ -9,7 +9,7 @@ void main() {
     vec3 dir = normalize(vDir);
     vec3 sky = texture(uSkybox, dir).rgb;
 
-    // c = cos(goc giua huong nhin va huong mat troi); c -> 1 khi dang nhin thang vao mat troi.
+    // c is the cosine between the view direction and sun direction.
     float c = max(dot(dir, normalize(uSunDir)), 0.0);
     float disc = smoothstep(0.9990, 0.9996, c);  
     float glow = pow(c, 48.0) * 0.35;             

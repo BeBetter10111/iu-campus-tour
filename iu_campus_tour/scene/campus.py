@@ -30,9 +30,9 @@ def build_campus():
         try:
             from scene.osm_campus import load_json, load_overrides, build_campus_from_osm
             from scene.tour_route import load_tour_spec
-            ground_photo = config.TEXTURE_DIR / "ground.jpg"          # có ảnh cỏ thật thì dùng, không thì cỏ sinh bằng code
+            ground_photo = config.TEXTURE_DIR / "ground.jpg"
             tour_path = DATA_DIR / "tour.json"
-            land_path = DATA_DIR / "landscape.json"                    # cây xanh, bãi xe, bề rộng đường
+            land_path = DATA_DIR / "landscape.json"
             return build_campus_from_osm(load_json(data_path),
                                          load_overrides(DATA_DIR / "building_overrides.json"),
                                          ground_texture=Texture.from_file(ground_photo) if ground_photo.exists() else None,

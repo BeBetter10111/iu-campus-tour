@@ -8,16 +8,15 @@ import numpy as np
 from scene.geometry2d import nearest_on_edges, point_in_edges
 
 ALLOWED_KINDS = {"service", "footway", "path", "pedestrian", "residential", "cycleway", "unclassified", "track"}
-KEY_DIGITS = 2           # Làm tròn tọa độ (cm) để nhận ra giao lộ
+KEY_DIGITS = 2
 
 
 def _key(p):
     return (round(float(p[0]), KEY_DIGITS), round(float(p[1]), KEY_DIGITS))
 
 
-# đồ thị đường
 def build_graph(roads, allowed=ALLOWED_KINDS):
-    """adj[node] = {neighbor: độ_dài}. Node = tọa độ (x, z) làm tròn; đỉnh chung giữa hai đường là giao lộ."""
+    """Build a road graph with edge lengths as weights."""
     adj = defaultdict(dict)
     for r in roads:
         if r.get("kind") not in allowed:
@@ -47,9 +46,9 @@ def snap_to_graph(adj, xz):
                     best = (d, a, b, (cx, cz))
     d, a, b, c = best
     if a is None:
-        raise ValueError("Đồ thị đường rỗng: không có đường nào thuộc loại cho phép")
+        raise ValueError("The road graph is empty")
     k = _key(c)
-    if k not in adj:                      # Chưa phải đỉnh sẵn có -> tách cạnh a-b thành a-k, k-b
+    if k not in adj:
         del adj[a][b]
         del adj[b][a]
         for n in (a, b):
@@ -74,7 +73,7 @@ def shortest_path(adj, src, dst):
                 dist[v], prev[v] = nd, u
                 heapq.heappush(heap, (nd, v))
     if dst not in dist:
-        raise ValueError(f"Không có đường nối {src} -> {dst} (hai điểm không cùng thành phần liên thông)")
+        raise ValueError(f"No road connects {src} to {dst}")
     path, u = [dst], dst
     while u != src:
         u = prev[u]
@@ -117,7 +116,7 @@ def _push_once(P, obstacles, clearance):
             d, cx, cz = nearest_on_edges(x, z, edges)
             inside = point_in_edges(x, z, edges)
             if inside or d < clearance:
-                vx, vz = (cx - x, cz - z) if inside else (x - cx, z - cz)   # hướng ra phía ngoài tòa nhà
+                vx, vz = (cx - x, cz - z) if inside else (x - cx, z - cz)
                 n = math.hypot(vx, vz)
                 if n < 1e-9:
                     vx, vz, n = 1.0, 0.0, 1.0
@@ -146,7 +145,6 @@ def min_clearance(points, obstacles):
     return best
 
 
-# tour.json
 def load_tour_spec(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -157,26 +155,26 @@ def build_tour(roads, spec, obstacles, eye_height=1.7, waypoint_spacing=7.0):
     adj = build_graph(roads)
     stops = spec["stops"]
     snaps = {}
-    for i, st in enumerate(stops):               # Snap hết các điểm TRƯỚC khi tìm đường (mỗi lần snap có thể chia cạnh)
+    for i, st in enumerate(stops):
         if "snap" in st:
             k, d = snap_to_graph(adj, st["snap"])
             snaps[i] = k
             if d > 15.0:
                 warnings.append(f"điểm dừng '{st.get('name', i)}' cách đường gần nhất {d:.0f} m (kiểm tra tọa độ)")
 
-    route, marks = [], []                         # marks[i] = chỉ số trong route nơi điểm dừng i bắt đầu
-    prev_node = None                              # node đường của điểm dừng "snap" ngay trước đó (None nếu trước đó là "free")
+    route, marks = [], []
+    prev_node = None
     for i, st in enumerate(stops):
         if "snap" in st:
             node = snaps[i]
-            if prev_node is not None:             # snap -> snap: đi theo đường ngắn nhất
+            if prev_node is not None:
                 route += [np.array(p) for p in shortest_path(adj, prev_node, node)[1:]]
-            else:                                 # sau đoạn "free" (hoặc điểm đầu): nối thẳng tới node
+            else:
                 route.append(np.array(node))
-            marks.append(len(route) - 1)          # điểm dừng "snap" nằm Ở CUỐI đoạn vừa nối
+            marks.append(len(route) - 1)
             prev_node = node
-        else:                                     # "free": đi thẳng qua các điểm cho trước (vào sân trong...)
-            marks.append(len(route))              # điểm dừng "free" bắt đầu từ điểm free đầu tiên
+        else:
+            marks.append(len(route))
             route += [np.array(p, dtype=np.float64) for p in st["free"]]
             prev_node = None
     last_i = len(stops) - 1

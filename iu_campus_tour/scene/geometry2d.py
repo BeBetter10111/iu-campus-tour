@@ -13,9 +13,9 @@ def point_in_edges(px, pz, edges):
     if len(edges) == 0:
         return False
     x0, z0, x1, z1 = edges.T
-    crosses = (z0 > pz) != (z1 > pz)                       # cạnh bắc ngang độ cao pz
+    crosses = (z0 > pz) != (z1 > pz)
     dz = np.where(z1 != z0, z1 - z0, 1.0)
-    x_at = x0 + (pz - z0) * (x1 - x0) / dz                 # hoành độ giao điểm
+    x_at = x0 + (pz - z0) * (x1 - x0) / dz
     return bool(np.count_nonzero(crosses & (px < x_at)) % 2)
 
 

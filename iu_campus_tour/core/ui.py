@@ -90,7 +90,7 @@ class Overlay:
         self.draw(texture, (x, y, width, height))
 
     def draw(self, texture, rect):
-        """rect = (x, y, w, h) tính theo NDC."""
+        """Convert a NDC rect into normalized rendering coordinates."""
         glDisable(GL_DEPTH_TEST)
         glDisable(GL_CULL_FACE)
         glEnable(GL_BLEND)

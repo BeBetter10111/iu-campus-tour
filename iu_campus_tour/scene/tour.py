@@ -33,6 +33,6 @@ class TourController:
             self.s %= self.path.total_length
 
     def progress(self):
-        """Trả về % hoàn thành 0..1, dùng cho HUD."""
+        """Return tour progress from 0 to 1."""
         s = self.s % self.path.total_length if self.path.closed else self.s
         return min(max(s / self.path.total_length, 0.0), 1.0)

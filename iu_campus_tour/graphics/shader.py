@@ -45,7 +45,7 @@ class Shader:
             for num in re.findall(r"\d+:(\d+)", log):
                 n = int(num)
                 if 1 <= n <= len(lines):
-                    context += f"\n  dòng {n}: {lines[n - 1].strip()}"
+                    context += f"\n  line {n}: {lines[n - 1].strip()}"
             kind_name = "VERTEX" if kind == GL_VERTEX_SHADER else "FRAGMENT"
             raise RuntimeError(f"{kind_name} shader compile error:\n{log}{context}")
         return sh

@@ -24,7 +24,7 @@ def polyline_strip(points, width, y, tile, full_width=False, closed=False):
     seg = (np.roll(P, -1, axis=0) - P) if closed else (P[1:] - P[:-1])
     length = np.maximum(np.hypot(seg[:, 0], seg[:, 1]), 1e-9)
     d = seg / length[:, None]
-    nrm = np.stack([-d[:, 1], d[:, 0]], axis=1)                  # pháp tuyến trái của từng đoạn
+    nrm = np.stack([-d[:, 1], d[:, 0]], axis=1)
 
     miter = np.zeros((n, 2))
     for i in range(n):
@@ -34,11 +34,11 @@ def polyline_strip(points, width, y, tile, full_width=False, closed=False):
             n0 = nrm[i - 1] if i > 0 else nrm[0]
             n1 = nrm[i] if i < n - 1 else nrm[-1]
         denom = 1.0 + float(n0 @ n1)
-        m = n1 if denom < 1e-6 else (n0 + n1) / denom             # quay đầu 180°: bỏ miter
+        m = n1 if denom < 1e-6 else (n0 + n1) / denom
         ln = float(np.hypot(*m))
         miter[i] = m * (MITER_LIMIT / ln) if ln > MITER_LIMIT else m
 
-    cum = np.concatenate([[0.0], np.cumsum(length)])             # quãng đường tại mỗi đỉnh (kể cả đỉnh đóng vòng)
+    cum = np.concatenate([[0.0], np.cumsum(length)])
     count = n + 1 if closed else n
     left = np.vstack([P + miter * width / 2, (P[0] + miter[0] * width / 2)[None]])[:count]
     right = np.vstack([P - miter * width / 2, (P[0] - miter[0] * width / 2)[None]])[:count]

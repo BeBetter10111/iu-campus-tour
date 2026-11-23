@@ -32,7 +32,7 @@ class ShadowMap:
         glDrawBuffer(GL_NONE)
         glReadBuffer(GL_NONE)
         if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
-            raise RuntimeError("Shadow map FBO không hoàn chỉnh (incomplete)")
+            raise RuntimeError("Shadow map framebuffer is incomplete")
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def begin(self):

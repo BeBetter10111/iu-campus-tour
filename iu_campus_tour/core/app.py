@@ -1,5 +1,3 @@
-"""App: game loop, máy trạng thái (MENU / FREE / TOUR), render 2 pass (shadow + main)."""
-
 from enum import Enum
 
 import pygame
@@ -24,16 +22,15 @@ from scene.tour import TourController
 
 
 class Mode(Enum):
-    MENU = 0   # Menu chọn chế độ, camera đứng yên
-    FREE = 1   # Đi bộ tự do: WASD + chuột + va chạm AABB
-    TOUR = 2   # Guided tour: camera tự chạy dọc spline
+    MENU = 0
+    FREE = 1
+    TOUR = 2
 
 
 class App:
-    SPAWN_POS = (0.0, config.EYE_HEIGHT, 15.0)   # Điểm xuất phát của chế độ FREE
-    SPAWN_YAW = -90.0                            # Nhìn về -Z (về phía tòa chính)
+    SPAWN_POS = (0.0, config.EYE_HEIGHT, 15.0)
+    SPAWN_YAW = -90.0
 
-    # ------------------------------------------------------------------ khởi tạo
     def __init__(self):
         self.window = Window()
         self.timer = Timer()
@@ -43,27 +40,22 @@ class App:
         glEnable(GL_CULL_FACE)
         glClearColor(*config.CLEAR_COLOR)
 
-        # Shader và shadow
+        # Shader and shadow
         self.shader = Shader.from_files("phong.vert", "phong.frag")
         self.depth_shader = Shader.from_files("shadow.vert", "shadow.frag")
         self.shadow_map = ShadowMap(config.SHADOW_MAP_SIZE)
         self.light = DirectionalLight()
 
-        # Thế giới
         self.scene = build_campus()
-        # --- OSM: điểm xuất phát lấy từ cảnh (nếu cảnh có), không thì dùng hằng số ở đầu class ---
         self.SPAWN_POS = getattr(self.scene, "spawn_pos", self.SPAWN_POS)
         self.SPAWN_YAW = getattr(self.scene, "spawn_yaw", self.SPAWN_YAW)
         self.skybox = Skybox()
         self.camera = FirstPersonCamera(position=self.SPAWN_POS, yaw=self.SPAWN_YAW)
         self.collision = CollisionWorld(self.scene.objects)
 
-        # Tour: path đóng kín qua các waypoint trong config
-        # --- OSM: tuyến tour tự động theo đường trong dữ liệu; không có thì dùng config.TOUR_WAYPOINTS ---
         tour_points = getattr(self.scene, "tour_waypoints", None) or config.TOUR_WAYPOINTS
         self.tour = TourController(CatmullRomPath(tour_points, closed=True))
 
-        # UI: texture menu tạo 1 lần; texture HUD chỉ tạo lại khi % thay đổi
         self.overlay = Overlay()
         self.menu_tex = self.overlay.make_text_texture([
             "IU CAMPUS VIRTUAL TOUR",
@@ -73,25 +65,23 @@ class App:
             "[ESC]  Thoát",
         ], font_size=30, min_size=(560, 300))
         self.hud_tex = None
-        self._hud_key = None            # (percent, paused, speed): đổi -> tạo lại texture HUD
+        self._hud_key = None
         self.free_hint_tex = self.overlay.make_text_texture([
             "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
             "M menu   B Phong/Blinn   N bóng   F2 debug   Phím mũi tên: mặt trời",
         ], title=False, font_size=20, pad=14)
 
-        # Tùy chọn hiển thị
         self.use_blinn = False
         self.shadows_on = True
         self.debug_mode = 0
-        self._shadow_dirty = True     # True để khung đầu tiên luôn render shadow map
+        self._shadow_dirty = True
 
         self.mode = Mode.MENU
         self.mouse_captured = False
         self.set_mode(Mode.MENU)
 
-    # ------------------------------------------------------------ máy trạng thái
     def set_mode(self, new_mode):
-        """Mọi chuyển chế độ đều đi qua đây để trạng thái chuột và camera luôn nhất quán."""
+        """Update application state and input capture consistently."""
         old_mode = self.mode
         self.mode = new_mode
 
@@ -101,17 +91,14 @@ class App:
         elif new_mode == Mode.FREE:
             self._set_mouse_capture(True)
             if old_mode == Mode.MENU:
-                # Từ menu vào: về điểm xuất phát chuẩn
                 self._respawn()
             else:
-                # Từ TOUR sang: giữ hướng nhìn, hạ về độ cao mắt người
                 self.camera.position[1] = config.EYE_HEIGHT
-                # Điểm cuối tour có thể nằm trong hộp va chạm (độ cao y khác) -> về spawn cho an toàn
                 if self.collision.collides(self.camera.position):
                     self._respawn()
 
         elif new_mode == Mode.TOUR:
-            self._set_mouse_capture(True)    # Vẫn ẩn con trỏ cho đẹp, nhưng KHÔNG xoay camera
+            self._set_mouse_capture(True)
             self.tour.start(self.camera)
 
     def _respawn(self):
@@ -123,9 +110,8 @@ class App:
         self.mouse_captured = enabled
         pygame.event.set_grab(enabled)
         pygame.mouse.set_visible(not enabled)
-        pygame.mouse.get_rel()               # Xả delta tích lũy để khung đầu không bị giật
+        pygame.mouse.get_rel()
 
-    # ------------------------------------------------------------------- vòng lặp
     def run(self):
         while self.running:
             dt = self.timer.tick()
@@ -138,7 +124,6 @@ class App:
                     f"{config.WINDOW_TITLE} | {self.mode.name} | {self.timer.fps:.0f} FPS")
         self.window.close()
 
-    # -------------------------------------------------------------------- sự kiện
     def _handle_events(self):
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
@@ -149,7 +134,6 @@ class App:
                 self._on_key_down(e.key)
 
     def _on_key_down(self, key):
-        # --- Phím riêng từng chế độ ---
         if self.mode == Mode.MENU:
             if key in (pygame.K_1, pygame.K_KP1):
                 self.set_mode(Mode.FREE)
@@ -157,9 +141,8 @@ class App:
                 self.set_mode(Mode.TOUR)
             elif key == pygame.K_ESCAPE:
                 self.running = False
-            return   # Menu không dùng các phím debug bên dưới
+            return
 
-        # Từ FREE/TOUR: ESC hoặc M quay lại menu
         if key in (pygame.K_ESCAPE, pygame.K_m):
             self.set_mode(Mode.MENU)
             return
@@ -175,10 +158,9 @@ class App:
         elif self.mode == Mode.FREE:
             if key == pygame.K_TAB:
                 self._set_mouse_capture(not self.mouse_captured)
-            elif key == pygame.K_g:                 # G: bay tự do (debug, tắt va chạm theo trục y)
+            elif key == pygame.K_g:
                 self.camera.fly_mode = not self.camera.fly_mode
 
-        # --- Phím hiển thị dùng chung ở FREE và TOUR ---
         if key == pygame.K_b:
             self.use_blinn = not self.use_blinn
             print("Specular:", "Blinn-Phong" if self.use_blinn else "Phong")
@@ -192,7 +174,6 @@ class App:
             print(f"SUN_AZIMUTH = {self.light.azimuth:.0f}, "
                   f"SUN_ELEVATION = {self.light.elevation:.0f}")
 
-    # --------------------------------------------------------------------- update
     def _update(self, dt):
         keys = pygame.key.get_pressed()
 
@@ -200,29 +181,29 @@ class App:
             if self.mouse_captured:
                 dx, dy = pygame.mouse.get_rel()
                 self.camera.process_mouse(dx, dy)
-            # Camera chỉ TÍNH độ dời; CollisionWorld quyết định đi được bao xa (trượt dọc tường)
             delta = self.camera.get_move_delta(keys, dt)
             self.camera.position = self.collision.move(self.camera.position, delta)
             if self.camera.fly_mode:
-                self.camera.position[1] = max(self.camera.position[1], 0.3)   # Không chui xuống đất
+                self.camera.position[1] = max(self.camera.position[1], 0.3)
             else:
-                self.camera.position[1] = config.EYE_HEIGHT
+                # Keep the camera at eye height above the current walking surface.
+                height_at = getattr(self.scene, "height_at", None)
+                ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
+                target = ground + config.EYE_HEIGHT
+                self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
 
         elif self.mode == Mode.TOUR:
-            pygame.mouse.get_rel()           # Xả delta chuột, tránh bị giật khi quay lại FREE
+            pygame.mouse.get_rel()
             self.tour.update(self.camera, dt)
 
-        # Chỉnh hướng mặt trời bằng phím mũi tên (ở mọi chế độ trừ menu)
         if self.mode != Mode.MENU:
             d_az = (int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])) * 40.0 * dt
             d_el = (int(keys[pygame.K_UP]) - int(keys[pygame.K_DOWN])) * 40.0 * dt
             if d_az or d_el:
                 self.light.set_angles(self.light.azimuth + d_az, self.light.elevation + d_el)
 
-        # Dời khung shadow map theo camera (có texel snapping). Chỉ render lại khi cần.
         self._shadow_dirty |= self.light.update(self.camera.position)
 
-    # --------------------------------------------------------------------- render
     def _render_shadow_pass(self):
         self.shadow_map.begin()
         self.depth_shader.use()
@@ -231,12 +212,10 @@ class App:
         self.shadow_map.end(self.window.width, self.window.height)
 
     def _render(self):
-        # ---- PASS 1: depth map từ góc nhìn mặt trời ----
         if self.shadows_on and self._shadow_dirty:
             self._render_shadow_pass()
             self._shadow_dirty = False
 
-        # ---- PASS 2: cảnh chính ----
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         view = self.camera.get_view_matrix()
         proj = self.camera.get_projection_matrix(self.window.aspect)
@@ -257,12 +236,11 @@ class App:
         s.set_float("uNormalOffset", self.light.normal_offset)
         s.set_float("uBias", config.SHADOW_BIAS)
         s.set_int("uShadowMap", 1)
-        self.shadow_map.bind(1)              # Depth map ở unit 1 (unit 0 dành cho albedo)
+        self.shadow_map.bind(1)
 
         self.scene.draw(s)
         self.skybox.draw(view, proj, self.light.direction, self.light.color)
 
-        # ---- Overlay 2D vẽ cuối cùng (đè lên cảnh) ----
         self._render_ui()
 
     def _render_ui(self):
@@ -276,10 +254,10 @@ class App:
 
         elif self.mode == Mode.TOUR:
             key = (int(self.tour.progress() * 100), self.tour.paused, round(self.tour.speed, 1))
-            if key != self._hud_key:          # Chỉ tạo lại texture khi chữ thực sự đổi
+            if key != self._hud_key:
                 self._hud_key = key
                 if self.hud_tex is not None:
-                    self.hud_tex.delete()     # Tránh rò rỉ texture trên GPU
+                    self.hud_tex.delete()
                 percent, paused, speed = key
                 state = "TẠM DỪNG" if paused else "ĐANG CHẠY"
                 self.hud_tex = self.overlay.make_text_texture([
