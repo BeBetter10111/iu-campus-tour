@@ -1,0 +1,328 @@
+{
+  "by_name": {
+    "A1": {
+      "levels": 7,
+      "facade": "maroon",
+      "note": "Khoi phia NAM cua cum A (Thu vien, Khoa Cong nghe Sinh hoc theo Google Maps). 7 tang. Toan bo mat ngoai va mat san trong deu mau do dom (theo xac nhan cua ban).",
+      "ground_facade": "white_plain",
+      "enterable": true,
+      "doors": [
+        {
+          "at": [
+            -80.7,
+            5.0
+          ],
+          "width": 2.6
+        },
+        {
+          "at": [
+            -34.2,
+            5.3
+          ],
+          "width": 2.6,
+          "stairs": {
+            "width": 10.5
+          }
+        },
+        {
+          "at": [
+            -81.1,
+            27.1
+          ],
+          "width": 2.6,
+          "stairs": {
+            "width": 9.5
+          }
+        },
+        {
+          "at": [
+            -57.4,
+            18.5
+          ],
+          "width": 6.0,
+          "stairs": {
+            "width": 28.0
+          }
+        },
+        {
+          "at": [
+            -33.9,
+            27.2
+          ],
+          "width": 2.6,
+          "stairs": {
+            "width": 9.5
+          }
+        },
+        {
+          "at": [
+            -1.35,
+            12.0
+          ],
+          "width": 2.6
+        }
+      ],
+      "lift": 0.9
+    },
+    "A2": {
+      "levels": 7,
+      "facade": "maroon",
+      "note": "Khoi phia BAC cua cum A (IU Book Zone theo Google Maps). 7 tang. Toan bo mat ngoai va mat san trong deu mau do dom (theo xac nhan cua ban).",
+      "ground_facade": "white_plain",
+      "enterable": true,
+      "doors": [
+        {
+          "at": [
+            -81.2,
+            -35.4
+          ],
+          "width": 2.6,
+          "stairs": {
+            "width": 9.5
+          }
+        },
+        {
+          "at": [
+            -57.5,
+            -31.97
+          ],
+          "width": 6.0,
+          "stairs": {
+            "width": 28.0
+          }
+        },
+        {
+          "at": [
+            -34.1,
+            -35.1
+          ],
+          "width": 2.6,
+          "stairs": {
+            "width": 9.5
+          }
+        },
+        {
+          "at": [
+            -80.7,
+            -16.7
+          ],
+          "width": 2.6
+        },
+        {
+          "at": [
+            -34.2,
+            -16.5
+          ],
+          "width": 2.6,
+          "stairs": {
+            "width": 10.5
+          }
+        },
+        {
+          "at": [
+            -2.6,
+            -26.0
+          ],
+          "width": 2.6
+        }
+      ],
+      "lift": 0.9
+    },
+    "Laboratory": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Nam ngay phia bac A2; trung vi tri 'Khu thuc hanh cong nghe sinh hoc' tren Google Maps. CAN XAC NHAN so tang (hien dung mac dinh 2)."
+    }
+  },
+  "by_id": {
+    "way/499419582": {
+      "levels": 7,
+      "facade": "maroon",
+      "note": "Khoi noi phia TAY giua A1 va A2 (678 m2), mau do dom. CAN XAC NHAN so tang (dang gia dinh 7, dac tu mat dat).",
+      "ground_facade": "white_plain",
+      "enterable": true,
+      "doors": [
+        {
+          "at": [
+            -84.9,
+            -6.0
+          ],
+          "width": 6.0,
+          "stairs": {
+            "width": 24.0
+          }
+        },
+        {
+          "at": [
+            -113.0,
+            -8.0
+          ],
+          "width": 3.0
+        }
+      ],
+      "lift": 0.9
+    },
+    "way/490258283": {
+      "levels": 4,
+      "min_levels": 2,
+      "facade": "white",
+      "note": "Khoi hep phia DONG (119 m2): chi la CAU NOI giua A1 va A2 o tang 3-4 (theo xac nhan cua ban) -> nang len tu 7.2 m den 14.4 m, ben duoi di bo xuyen qua. Quy uoc tang 1 = tang tret; neu 'tang 3-4' cua ban la lau 3-4 (tinh tu tren tang tret) thi doi min_levels=3, levels=5. Nang theo +0.9 m cung A1/A2 (khong co be).",
+      "lift": 0.9,
+      "plinth": false
+    },
+    "way/259209295": {
+      "levels": null,
+      "facade": "plain",
+      "note": "IU Canteen (khoi chinh, 1213 m2, khop vi tri va dien tich voi anh OSM). CAN XAC NHAN so tang."
+    },
+    "way/490258285": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Khoi phu phia tay cua can-tin (586 m2). CAN XAC NHAN."
+    },
+    "way/490258286": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Khoi phu phia tay-bac cua can-tin (248 m2). CAN XAC NHAN."
+    },
+    "way/1216806172": {
+      "levels": null,
+      "facade": "concrete",
+      "note": "Toa nha hanh chinh IU (Google Maps goi la A3 building), OSM danh dau building=construction. CAN XAC NHAN: da xay xong chua, may tang? Neu xong: doi facade thanh white va dat levels."
+    },
+    "way/717915808": {
+      "skip": true,
+      "note": "Nha Van hoa Sinh vien (OSM: 6 tang). Nam ~250-340 m ve phia NAM, ben kia duong Quang Truong Sang Tao -> ngoai IU."
+    },
+    "way/290484111": {
+      "skip": true,
+      "note": "Nha H1. Nam ~250-330 m ve phia DONG-BAC -> ngoai IU."
+    },
+    "way/290482143": {
+      "skip": true,
+      "note": "Nha H2 (OSM: 8 tang). Nam ~290-360 m ve phia DONG-BAC -> ngoai IU."
+    },
+    "way/290242864": {
+      "skip": true,
+      "note": "Nha dieu hanh. Nam ~300-350 m ve phia TAY-NAM -> ngoai IU."
+    },
+    "way/290326857": {
+      "skip": true,
+      "note": "BK English. Nam ~310-350 m ve phia DONG, ben kia duong Le Quy Don / Ta Quang Buu -> ngoai IU."
+    },
+    "way/738556649": {
+      "skip": true,
+      "note": "Nam ~180-230 m ve phia NAM, ben kia duong Quang Truong Sang Tao -> ngoai IU."
+    },
+    "way/727362141": {
+      "skip": true,
+      "note": "Nam ben kia duong William Shakespeare (phia TAY) -> ngoai IU."
+    },
+    "relation/3858829#0": {
+      "skip": true,
+      "note": "Co 2 lo (san trong). Nam ben kia duong William Shakespeare -> ngoai IU."
+    },
+    "relation/15820688#0": {
+      "skip": true,
+      "note": "Co 2 lo (san trong). Nam ben kia duong William Shakespeare -> ngoai IU."
+    },
+    "way/1419105580": {
+      "skip": true,
+      "note": "Nha kinh (greenhouse), nam xa ve phia TAY, ben kia duong William Shakespeare -> ngoai IU. (Nha kinh 'Nursery greenhouse' trong anh Google Maps KHONG co trong du lieu OSM nay.)"
+    },
+    "way/1419105581": {
+      "skip": true,
+      "note": "Nam xa ve phia TAY, ben kia duong William Shakespeare -> ngoai IU."
+    },
+    "manual/canteen_north_1": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Noi dai can-tin ve phia Bac den hang voi mat Bac cua A2 (z = -35), theo anh ban gui. CAN XAC NHAN so tang."
+    },
+    "manual/canteen_north_2": {
+      "levels": null,
+      "facade": "plain",
+      "note": "Noi dai khoi phu can-tin ve phia Bac; chua tru phan nha phu (way/490258286) da co san."
+    }
+  },
+  "connect": [
+    {
+      "between": [
+        "way/730124416",
+        "way/499419582"
+      ],
+      "at": [
+        -93.2,
+        -16.7
+      ],
+      "width": 4.0
+    },
+    {
+      "between": [
+        "way/259209294",
+        "way/499419582"
+      ],
+      "at": [
+        -93.3,
+        4.97
+      ],
+      "width": 4.0
+    }
+  ],
+  "extra_buildings": [
+    {
+      "id": "manual/canteen_north_1",
+      "name": "Can-tin (phan noi dai, khoi chinh)",
+      "kind": "yes",
+      "outer": [
+        [
+          -171.62,
+          -35.0
+        ],
+        [
+          -150.73,
+          -35.0
+        ],
+        [
+          -150.73,
+          -0.89
+        ],
+        [
+          -171.62,
+          -1.19
+        ]
+      ]
+    },
+    {
+      "id": "manual/canteen_north_2",
+      "name": "Can-tin (phan noi dai, khoi phu)",
+      "kind": "yes",
+      "outer": [
+        [
+          -171.62,
+          -35.0
+        ],
+        [
+          -188.8,
+          -35.0
+        ],
+        [
+          -188.8,
+          -17.0
+        ],
+        [
+          -184.4,
+          -17.0
+        ],
+        [
+          -184.38,
+          -1.82
+        ],
+        [
+          -171.62,
+          -1.19
+        ]
+      ]
+    }
+  ]
+}

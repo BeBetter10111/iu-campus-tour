@@ -1,0 +1,355 @@
+{
+  "seed": 42,
+  "road_widths": {
+    "service": 5.5,
+    "footway": 2.8,
+    "path": 2.2,
+    "cycleway": 3.0,
+    "residential": 6.5,
+    "tertiary": 8.5
+  },
+  "parking": [
+    {
+      "name": "Bai xe Tay-Bac",
+      "polygon": [
+        [
+          -169.1,
+          -71.2
+        ],
+        [
+          -125.4,
+          -71.2
+        ],
+        [
+          -125.4,
+          -45.5
+        ],
+        [
+          -169.1,
+          -45.5
+        ]
+      ],
+      "fence": true,
+      "gates": [
+        {
+          "at": [
+            -147.0,
+            -45.5
+          ],
+          "width": 4.5
+        },
+        {
+          "at": [
+            -125.4,
+            -52.0
+          ],
+          "width": 4.5
+        }
+      ],
+      "roof": {
+        "height": 3.2,
+        "thickness": 0.25,
+        "column_spacing": 8.0
+      }
+    },
+    {
+      "name": "Bai xe Dong-Bac",
+      "polygon": [
+        [
+          -66.1,
+          -63.1
+        ],
+        [
+          4.8,
+          -63.1
+        ],
+        [
+          4.8,
+          -47.3
+        ],
+        [
+          -66.1,
+          -47.3
+        ]
+      ],
+      "fence": true,
+      "gates": [
+        {
+          "at": [
+            -30.0,
+            -47.3
+          ],
+          "width": 4.5
+        },
+        {
+          "at": [
+            -60.0,
+            -47.3
+          ],
+          "width": 4.5
+        }
+      ],
+      "roof": {
+        "height": 3.2,
+        "thickness": 0.25,
+        "column_spacing": 8.0
+      }
+    }
+  ],
+  "tree_zones": [
+    {
+      "name": "Vuon san trong (phia A2)",
+      "polygon": [
+        [
+          -84.0,
+          -16.2
+        ],
+        [
+          -31.7,
+          -16.2
+        ],
+        [
+          -31.7,
+          -11.6
+        ],
+        [
+          -84.0,
+          -11.6
+        ]
+      ],
+      "density": 6.0,
+      "kinds": {
+        "tree": 0.15,
+        "small": 0.35,
+        "shrub": 0.5
+      },
+      "wall_clearance": 0.8,
+      "tour_clearance": 1.6
+    },
+    {
+      "name": "Vuon san trong (phia A1)",
+      "polygon": [
+        [
+          -84.0,
+          -1.9
+        ],
+        [
+          -31.7,
+          -1.9
+        ],
+        [
+          -31.7,
+          4.7
+        ],
+        [
+          -84.0,
+          4.7
+        ]
+      ],
+      "density": 6.0,
+      "kinds": {
+        "tree": 0.15,
+        "small": 0.35,
+        "shrub": 0.5
+      },
+      "wall_clearance": 0.8,
+      "tour_clearance": 1.6
+    },
+    {
+      "name": "Bai co phia Nam A1",
+      "polygon": [
+        [
+          -139.0,
+          43.5
+        ],
+        [
+          -66.6,
+          43.5
+        ],
+        [
+          -66.6,
+          74.5
+        ],
+        [
+          -139.0,
+          74.5
+        ]
+      ],
+      "density": 4.0,
+      "kinds": {
+        "tree": 0.6,
+        "small": 0.25,
+        "shrub": 0.15
+      },
+      "wall_clearance": 2.0
+    }
+  ],
+  "street_trees": {
+    "enabled": true,
+    "spacing": 14.0,
+    "offset": 2.4,
+    "margin": 40.0,
+    "max": 120
+  },
+  "perimeter": {
+    "enabled": true,
+    "count": 220,
+    "margin": 90.0,
+    "falloff": 60.0,
+    "kinds": {
+      "tree": 0.7,
+      "small": 0.3
+    },
+    "wall_clearance": 5.0
+  },
+  "door_paths": {
+    "enabled": true,
+    "extra_width": 2.5,
+    "max_length": 30.0,
+    "default_length": 8.0
+  },
+  "paved_areas": [
+    {
+      "name": "Loi giua san trong (giua hai lan co)",
+      "polygon": [
+        [
+          -84.8,
+          -11.5
+        ],
+        [
+          7.5,
+          -11.5
+        ],
+        [
+          7.5,
+          -2.0
+        ],
+        [
+          -84.8,
+          -2.0
+        ]
+      ],
+      "surface": "paving",
+      "benches": {
+        "count": 5,
+        "min_spacing": 10.0,
+        "seed": 7,
+        "door_clearance": 4.0,
+        "avoid": [
+          [
+            -29.0,
+            -6.75,
+            5.0
+          ]
+        ]
+      }
+    }
+  ],
+  "campus_boundary": {
+    "fence": true,
+    "height": 2.0,
+    "auto_gates": true,
+    "gates": [],
+    "polygon": [
+      [26.9, -72.0],
+      [-21.0, -65.6],
+      [-65.8, -68.3],
+      [-155.6, -92.5],
+      [-284.1, -113.4],
+      [-231.0, -40.3],
+      [-207.6, 0.7],
+      [-173.0, 72.4],
+      [-145.8, 154.4],
+      [-92.2, 141.0],
+      [-33.5, 131.5],
+      [23.6, 130.8],
+      [68.0, 133.6],
+      [101.1, 137.2],
+      [46.8, -20.0]
+    ]
+  },
+  "road_fit": {
+    "enabled": true,
+    "clearance": 3.5,
+    "footway_clearance": 0.4,
+    "max_push": 3.5
+  },
+  "sidewalks": {
+    "enabled": true,
+    "kerb_width": 0.18,
+    "kerb_height": 0.15,
+    "kinds": {
+      "tertiary": 3.5,
+      "tertiary_link": 3.2,
+      "residential": 3.0,
+      "unclassified": 3.0,
+      "service": 2.8
+    }
+  },
+  "sign_destinations": [
+    {
+      "vi": "TÒA NHÀ A1",
+      "en": "A1 Building",
+      "at": [
+        -53.8,
+        17.5
+      ]
+    },
+    {
+      "vi": "TÒA NHÀ A2",
+      "en": "A2 Building",
+      "at": [
+        -57.2,
+        -27.6
+      ]
+    },
+    {
+      "vi": "BÃI XE Ô-TÔ",
+      "en": "Car Park",
+      "at": [
+        52.3,
+        75.3
+      ]
+    },
+    {
+      "vi": "BÃI XE MÁY",
+      "en": "Motorbike Park",
+      "at": [
+        -147.2,
+        -58.4
+      ]
+    },
+    {
+      "vi": "CĂN TIN",
+      "en": "Canteen",
+      "at": [
+        -141.7,
+        20.0
+      ]
+    }
+  ],
+  "signs": [
+    {
+      "name": "Bang chi dan gan diem xuat phat",
+      "at": [
+        -100.6,
+        77.5
+      ],
+      "face_toward": [
+        -100.6,
+        90.0
+      ]
+    },
+    {
+      "name": "Bang chi dan truoc loi vao A1",
+      "at": [
+        -50.0,
+        33.0
+      ],
+      "face_toward": [
+        -50.0,
+        45.0
+      ]
+    }
+  ]
+}

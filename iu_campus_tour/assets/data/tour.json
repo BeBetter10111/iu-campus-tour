@@ -1,0 +1,103 @@
+{
+  "eye_height": 1.7,
+  "clearance": 2.0,
+  "corner_smoothing": 10.0,
+  "stops": [
+    {
+      "name": "Lối vào khu A (A1)",
+      "snap": [
+        -57.3,
+        39.5
+      ]
+    },
+    {
+      "name": "Mặt trước tòa hành chính IU",
+      "snap": [
+        -28.0,
+        39.7
+      ]
+    },
+    {
+      "name": "Góc Đông-Nam khu A",
+      "snap": [
+        11.3,
+        39.8
+      ]
+    },
+    {
+      "name": "Phía Đông cụm A",
+      "snap": [
+        10.2,
+        -7.9
+      ]
+    },
+    {
+      "name": "Sân trong cụm A (qua cầu nối)",
+      "free": [
+        [
+          4,
+          -8.5
+        ],
+        [
+          -29,
+          -8.5
+        ],
+        [
+          -68,
+          -8.5
+        ],
+        [
+          -76,
+          -6.8
+        ],
+        [
+          -68,
+          -4.8
+        ],
+        [
+          -29,
+          -4.8
+        ],
+        [
+          4,
+          -4.8
+        ]
+      ]
+    },
+    {
+      "name": "Ra lại đường phía Đông",
+      "snap": [
+        10.2,
+        -7.9
+      ]
+    },
+    {
+      "name": "Phía Bắc - Phòng thí nghiệm",
+      "snap": [
+        -72.9,
+        -42.9
+      ]
+    },
+    {
+      "name": "Góc Tây-Bắc khu A",
+      "snap": [
+        -115.6,
+        -43.5
+      ]
+    },
+    {
+      "name": "Phía Tây khối nối",
+      "snap": [
+        -117.1,
+        -1.5
+      ]
+    },
+    {
+      "name": "Căn-tin IU",
+      "snap": [
+        -141.7,
+        20.0
+      ]
+    }
+  ]
+}

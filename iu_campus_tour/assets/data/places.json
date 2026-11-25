@@ -1,0 +1,23 @@
+{
+  "places": [
+    {"key": "1", "short": "A1", "name_vi": "TÒA NHÀ A1", "name_en": "A1 Building",
+     "info": "Thư viện - Khoa Công nghệ Sinh học", "at": [-53.8, 17.5], "radius": 35,
+     "stand": [-60.0, 42.0]},
+    {"key": "2", "short": "A2", "name_vi": "TÒA NHÀ A2", "name_en": "A2 Building",
+     "info": "IU Book Zone", "at": [-57.2, -27.6], "radius": 35,
+     "stand": [-45.0, -6.0]},
+    {"key": "3", "short": "Căn tin", "name_vi": "CĂN TIN", "name_en": "Canteen",
+     "info": "Căn tin IU", "at": [-163.0, 11.0], "radius": 30,
+     "stand": [-141.7, 20.0]},
+    {"key": "4", "short": "Bãi xe ô tô", "name_vi": "BÃI XE Ô-TÔ", "name_en": "Car Park",
+     "info": "Bãi đỗ xe ô tô phía Đông", "at": [52.3, 75.3], "radius": 25,
+     "stand": [30.0, 75.0]},
+    {"key": "5", "short": "Bãi xe máy", "name_vi": "BÃI XE MÁY", "name_en": "Motorbike Park",
+     "info": "Bãi xe có mái che và hàng rào", "at": [-147.2, -58.4], "radius": 25,
+     "stand": [-147.0, -30.0]},
+    {"name_vi": "TÒA NHÀ HÀNH CHÍNH", "name_en": "Administration Building",
+     "info": "Tòa nhà hành chính IU (A3 trên Google Maps)", "at": [-21.1, 60.1], "radius": 30},
+    {"name_vi": "PHÒNG THỰC HÀNH", "name_en": "Laboratory",
+     "info": "Khu thực hành công nghệ sinh học", "at": [-88.3, -53.5], "radius": 18}
+  ]
+}

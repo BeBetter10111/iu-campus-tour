@@ -1,24 +1,62 @@
-"""Cấu hình toàn cục cho dự án IU Campus Virtual Tour.
-
-Gom mọi hằng số vào một nơi để dễ chỉnh và dễ trích dẫn vào báo cáo.
-"""
-
-# --- Cửa sổ ---
+# Window
 WINDOW_TITLE = "IU Campus Virtual Tour"
 WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
-VSYNC = True            # Đồng bộ với tần số quét màn hình -> tránh xé hình
-MSAA_SAMPLES = 4        # Khử răng cưa 4x (đặt 0 để tắt nếu GPU yếu)
+VSYNC = True            
+MSAA_SAMPLES = 4        
 
-# --- OpenGL ---
+# OpenGL
 GL_MAJOR = 3
-GL_MINOR = 3            # Core profile 3.3 -> chạy tốt trên Windows/Linux/macOS
+GL_MINOR = 3            
 
-# PyOpenGL mặc định gọi glGetError sau MỌI lệnh GL -> rất chậm.
-# Bật True khi debug, để False khi đo FPS / nộp bản cuối.
 GL_ERROR_CHECKING = True
 
-# --- Render ---
-CLEAR_COLOR = (0.53, 0.81, 0.92, 1.0)   # Xanh da trời nhạt (tạm, sẽ thay bằng Skybox ở Phase 3)
-FPS_CAP = 0             # 0 = không giới hạn (khi VSYNC bật thì màn hình tự giới hạn)
-FPS_TITLE_INTERVAL = 0.5  # Giây giữa hai lần cập nhật FPS lên tiêu đề cửa sổ
+# Render
+CLEAR_COLOR = (0.53, 0.81, 0.92, 1.0)   #
+FPS_CAP = 0            
+FPS_TITLE_INTERVAL = 0.5  
+
+# Camera
+FOV = 60.0            
+NEAR_PLANE = 0.1
+FAR_PLANE = 500.0
+EYE_HEIGHT = 1.7      
+WALK_SPEED = 4.0      # m/s
+RUN_SPEED = 8.0       # m/s 
+MOUSE_SENSITIVITY = 0.1  
+
+# Assets 
+from pathlib import Path
+ASSET_DIR = Path(__file__).resolve().parent / "assets"
+TEXTURE_DIR = ASSET_DIR / "textures"
+MODEL_DIR = ASSET_DIR / "models"
+SKYBOX_DIR = ASSET_DIR / "skybox"
+
+# Lighting
+SUN_AZIMUTH = 160.0     
+SUN_ELEVATION = 35.0   
+SUN_COLOR = (1.0, 0.95, 0.85)
+SUN_INTENSITY = 0.85
+AMBIENT_COLOR = (0.46, 0.46, 0.48)   # sky fill light: shaded facades stay bright as in real photos
+DAY_LENGTH_SECONDS = 240.0   # automatic day/night cycle: one full sun circle
+NIGHT_SPEED_FACTOR = 3.0     # nights pass faster than days
+
+# Shadow mapping
+SHADOW_MAP_SIZE = 2048
+SHADOW_RADIUS = 80.0        
+SHADOW_DISTANCE = 150.0     
+SHADOW_BIAS = 0.0002        
+SHADOW_NORMAL_OFFSET = 1.0  
+
+# Player and collision
+PLAYER_RADIUS = 0.35     
+PLAYER_HEAD_GAP = 0.2    
+
+# Guided Tour 
+TOUR_SPEED = 3.5         # m/s
+TOUR_LOOK_AHEAD = 6.0    
+TOUR_LOOK_SMOOTH = 3.0   
+TOUR_WAYPOINTS = [
+    (0, 1.7, 15), (-15, 1.7, 0), (-15, 1.7, -22), (0, 4.0, -26),
+    (15, 1.7, -22), (15, 1.7, 0), (10, 1.7, 20),
+]
