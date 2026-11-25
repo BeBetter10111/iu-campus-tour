@@ -97,13 +97,25 @@ def test_sidewalk_runs_stop_at_buildings_and_other_roads():
 
 
 def test_sidewalk_narrows_beside_wall():
+    cfg = _load("landscape.json")["sidewalks"]
     road = {"id": "m", "kind": "residential", "points": [[-30, 0], [30, 0]]}
     wall = [(-10, 5.2), (10, 5.2), (10, 12), (-10, 12)]      # 5.2 - 3.25 - 0.18 = 1.77 m left
-    runs = plan_sidewalks([road], STYLES, _edges(wall), [], (-100, -100, 100, 100))
+    runs = plan_sidewalks([road], STYLES, _edges(wall), [], (-100, -100, 100, 100), cfg)
     near = [r for r in runs if r["side"] == 1]
     assert near, "a narrower sidewalk is still built"
     w = np.concatenate([r["walk_w"] for r in near])
-    assert w.min() < 2.0 - 0.1 and w.min() >= 0.9
+    assert w.min() < cfg["kinds"]["residential"] - 0.1 and w.min() >= 0.9
+    for r in near:
+        outer = r["P"] + r["side"] * np.array([0.0, 1.0]) * (
+            r["hw"] + cfg["kerb_width"] + r["walk_w"][:, None])
+        assert dist_points_edges(outer, rings_to_edges([wall])).min() >= 0.14
+
+
+def test_sidewalk_uses_wider_config_in_open_area():
+    cfg = _load("landscape.json")["sidewalks"]
+    road = {"id": "m", "kind": "residential", "points": [[-30, 0], [30, 0]]}
+    runs = plan_sidewalks([road], STYLES, [], [], (-100, -100, 100, 100), cfg)
+    assert runs and all(np.allclose(r["walk_w"], cfg["kinds"]["residential"]) for r in runs)
 
 
 def test_build_sidewalks_meshes():

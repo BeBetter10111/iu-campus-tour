@@ -82,6 +82,7 @@ class App:
         self.shadows_on = True
         self.debug_mode = 0
         self._shadow_dirty = True
+        self._jump_velocity = 0.0
 
         self.mode = Mode.MENU
         self.mouse_captured = False
@@ -112,6 +113,7 @@ class App:
         self.camera.position[:] = self.SPAWN_POS
         self.camera.yaw, self.camera.pitch = self.SPAWN_YAW, 0.0
         self.camera._update_vectors()
+        self._jump_velocity = 0.0
 
     def _teleport(self, place):
         height_at = getattr(self.scene, "height_at", None)
@@ -121,6 +123,7 @@ class App:
             self.camera.position[:] = pose[0]
             self.camera.yaw, self.camera.pitch = pose[1], 0.0
             self.camera._update_vectors()
+            self._jump_velocity = 0.0
 
     def _set_mouse_capture(self, enabled):
         self.mouse_captured = enabled
@@ -176,6 +179,13 @@ class App:
                 self._set_mouse_capture(not self.mouse_captured)
             elif key == pygame.K_g:
                 self.camera.fly_mode = not self.camera.fly_mode
+                if self.camera.fly_mode:
+                    self._jump_velocity = 0.0
+            elif key == pygame.K_SPACE and not self.camera.fly_mode:
+                height_at = getattr(self.scene, "height_at", None)
+                ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
+                if abs(float(self.camera.position[1]) - (ground + config.EYE_HEIGHT)) < 0.15:
+                    self._jump_velocity = 6.5
             else:
                 place = place_for_key(self.places, pygame.key.name(key).strip("[]"))
                 if place:
@@ -210,7 +220,15 @@ class App:
                 height_at = getattr(self.scene, "height_at", None)
                 ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
                 target = ground + config.EYE_HEIGHT
-                self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
+                if self._jump_velocity != 0.0:
+                    self._jump_velocity -= 18.0 * dt
+                    vertical_delta = [0.0, self._jump_velocity * dt, 0.0]
+                    self.camera.position = self.collision.move(self.camera.position, vertical_delta)
+                    if float(self.camera.position[1]) <= target:
+                        self.camera.position[1] = target
+                        self._jump_velocity = 0.0
+                else:
+                    self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
 
         elif self.mode == Mode.TOUR:
             pygame.mouse.get_rel()

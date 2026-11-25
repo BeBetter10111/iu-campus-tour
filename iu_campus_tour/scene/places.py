@@ -1,5 +1,3 @@
-"""Named places: look-at labels and numbered teleport (data in assets/data/places.json)."""
-
 import json
 import math
 
