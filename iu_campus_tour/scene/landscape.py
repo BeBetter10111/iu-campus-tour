@@ -3,6 +3,8 @@ import math
 import numpy as np
 from scene.geometry2d import rings_to_edges
 RADIUS = {"tree": 2.6, "small": 1.5, "shrub": 0.7}
+# Max horizontal canopy reach (see graphics/vegetation.make_plant) + small gap, so leaves never poke into walls.
+CANOPY = {"tree": 3.6, "small": 1.9, "shrub": 0.9}
 def load_landscape(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -93,10 +95,16 @@ class Placer:
         names = list(kinds)
         w = np.array([kinds[k] for k in names], float)
         w /= w.sum()
-        ok = self.c.valid(cands, **clear)
+        picks = self.rng.choice(len(names), size=len(cands), p=w)
+        ok = np.zeros(len(cands), bool)
+        for i, k in enumerate(names):
+            m = picks == i
+            if m.any():
+                c = dict(clear, wall=max(clear.get("wall", 3.0), CANOPY[k]))
+                ok[m] = self.c.valid(cands[m], **c)
         got = 0
-        for p in cands[ok]:
-            kind = names[int(self.rng.choice(len(names), p=w))]
+        for p, ki in zip(cands[ok], picks[ok]):
+            kind = names[int(ki)]
             r = RADIUS[kind]
             if self._free(p, r):
                 self.pos = np.vstack([self.pos, p])
@@ -143,11 +151,19 @@ def generate_vegetation(spec, constraints, roads, road_styles, bounds, existing_
     rng = np.random.default_rng(seed)
     pl = Placer(constraints, rng)
     stats = {}
-    for x, z in existing_trees:
-        pl.items.append((x, z, "tree", "osm"))
+    osm = np.asarray(existing_trees, float).reshape(-1, 2)
+    inside = np.zeros(len(osm), bool)
+    for e in constraints.building_edges:
+        inside |= points_in_edges(osm, e)
+    dw = dist_points_segments(osm, constraints.all_walls)
+    for (x, z), bad, d in zip(osm, inside, dw):
+        if bad or d < CANOPY["small"]:
+            continue                                  # OSM tree inside/against a building -> drop
+        kind = "tree" if d >= CANOPY["tree"] else "small"
+        pl.items.append((float(x), float(z), kind, "osm"))
         pl.pos = np.vstack([pl.pos, [x, z]])
-        pl.rad = np.append(pl.rad, RADIUS["tree"])
-    stats["osm"] = len(existing_trees)
+        pl.rad = np.append(pl.rad, RADIUS[kind])
+    stats["osm"] = len(pl.items)
     for z in spec.get("tree_zones", []):
         poly = np.asarray(z["polygon"], float)
         area = abs(0.5 * np.sum(poly[:, 0] * np.roll(poly[:, 1], -1) - np.roll(poly[:, 0], -1) * poly[:, 1]))

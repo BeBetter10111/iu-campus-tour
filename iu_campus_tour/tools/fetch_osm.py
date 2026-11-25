@@ -2,7 +2,7 @@ import argparse
 import json
 import math
 import re
-import sys
+import sysn
 import time
 import urllib.error
 import urllib.parse

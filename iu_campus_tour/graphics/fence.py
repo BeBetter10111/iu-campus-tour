@@ -1,5 +1,3 @@
-"""Low fence meshes and collision boxes."""
-
 import numpy as np
 
 from graphics.roads import merge_meshes

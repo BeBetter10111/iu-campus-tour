@@ -68,13 +68,14 @@ class App:
         self._hud_key = None
         self.free_hint_tex = self.overlay.make_text_texture([
             "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
-            "M menu   B Phong/Blinn   N bóng   F2 debug   Phím mũi tên: mặt trời",
+            "M menu   B Phong/Blinn   N bóng   F2 debug   Mũi tên: mặt trời   T ngày/đêm tự động",
         ], title=False, font_size=20, pad=14)
 
         self.use_blinn = False
         self.shadows_on = True
         self.debug_mode = 0
         self._shadow_dirty = True
+        self.day_cycle = False
 
         self.mode = Mode.MENU
         self.mouse_captured = False
@@ -170,6 +171,9 @@ class App:
         elif key == pygame.K_F2:
             self.debug_mode = (self.debug_mode + 1) % 3
             print("Debug mode:", ("normal", "shadow factor", "normals")[self.debug_mode])
+        elif key == pygame.K_t:
+            self.day_cycle = not self.day_cycle
+            print("Day/night cycle:", "ON" if self.day_cycle else "OFF")
         elif key == pygame.K_p:
             print(f"SUN_AZIMUTH = {self.light.azimuth:.0f}, "
                   f"SUN_ELEVATION = {self.light.elevation:.0f}")
@@ -199,6 +203,8 @@ class App:
         if self.mode != Mode.MENU:
             d_az = (int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])) * 40.0 * dt
             d_el = (int(keys[pygame.K_UP]) - int(keys[pygame.K_DOWN])) * 40.0 * dt
+            if self.day_cycle:
+                d_el += config.DAY_CYCLE_SPEED * dt
             if d_az or d_el:
                 self.light.set_angles(self.light.azimuth + d_az, self.light.elevation + d_el)
 
