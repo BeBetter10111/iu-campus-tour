@@ -5,7 +5,7 @@ import numpy as np
 from graphics.roads import merge_meshes
 
 NSHADES = 8
-TREE_KINDS = {"tree": (5.5, 9.0), "small": (3.0, 4.5), "shrub": (0.8, 1.6)}
+TREE_KINDS = {"tree": (5.5, 9.0), "small": (3.0, 4.5), "shrub": (0.8, 1.6), "palm": (6.0, 9.0)}
 TRUNK_BOX_HALF = 0.22
 TRUNK_BOX_HEIGHT = 3.0
 
@@ -55,6 +55,27 @@ def trunk_part(cx, cz, h, r0, r1, sides=6):
     return _orient(np.array(verts, np.float32), np.array(idx, np.uint32))
 
 
+def frond_part(x, y, z, ang, length, width, droop, shade, segs=6):
+    """One palm leaf: a tapered, drooping double-sided strip."""
+    u = (shade % NSHADES + 0.5) / NSHADES
+    d = np.array([math.cos(ang), 0.0, math.sin(ang)])
+    side = np.array([-math.sin(ang), 0.0, math.cos(ang)])
+    verts = []
+    for k in range(segs + 1):
+        t = k / segs
+        c = np.array([x, y, z]) + d * (length * t) + np.array([0.0, 0.35 * length * t - droop * length * t * t, 0.0])
+        w = width * math.sin(math.pi * min(t * 1.15, 1.0)) + 0.02
+        for sgn in (-1, 1):
+            p = c + side * sgn * w
+            verts.append([*p, 0.0, 1.0, 0.0, u, 0.35 + 0.55 * t])
+    idx = []
+    for k in range(segs):
+        a = 2 * k
+        idx += [a, a + 2, a + 1, a + 1, a + 2, a + 3,      # top face
+                a, a + 1, a + 2, a + 1, a + 3, a + 2]      # bottom face (no culling gaps)
+    return np.array(verts, np.float32), np.array(idx, np.uint32)
+
+
 def make_plant(x, z, kind, rng):
     """Tropical-looking plant: trunk + a loose cluster of foliage clumps (max reach ~1.15 R)."""
     lo, hi = TREE_KINDS[kind]
@@ -68,6 +89,20 @@ def make_plant(x, z, kind, rng):
             parts.append(sphere_part(x + 0.3 * R * math.cos(a), 0.45 * R, z + 0.3 * R * math.sin(a),
                                      0.6 * R, sy=0.8, shade=shade + int(rng.integers(-1, 2))))
         return None, merge_meshes(parts), None
+
+    if kind == "palm":
+        top = H
+        lean = float(rng.uniform(0, 2 * math.pi))
+        trunk = trunk_part(x, z, top + 0.2, 0.16, 0.12, sides=7)
+        L = 0.33 * H
+        parts = [sphere_part(x, top, z, 0.35, sy=1.0, shade=shade)]
+        n = int(rng.integers(9, 13))
+        for k in range(n):
+            a = lean + 2 * math.pi * k / n + float(rng.uniform(-0.15, 0.15))
+            parts.append(frond_part(x, top, z, a, L * float(rng.uniform(0.8, 1.0)), 0.35,
+                                    float(rng.uniform(0.7, 1.1)), shade + int(rng.integers(-1, 2))))
+        box = np.array([x - TRUNK_BOX_HALF, 0.0, z - TRUNK_BOX_HALF, x + TRUNK_BOX_HALF, TRUNK_BOX_HEIGHT, z + TRUNK_BOX_HALF])
+        return trunk, merge_meshes(parts), box
 
     trunk_h = float(rng.uniform(0.32, 0.44)) * H
     R = 0.32 * H

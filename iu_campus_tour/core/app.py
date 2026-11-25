@@ -193,6 +193,7 @@ class App:
             pygame.mouse.get_rel()
             self.tour.update(self.camera, dt)
 
+        self.light.advance(dt)
         self._shadow_dirty |= self.light.update(self.camera.position)
 
     def _render_shadow_pass(self):

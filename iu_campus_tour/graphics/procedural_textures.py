@@ -1,3 +1,5 @@
+"""Procedurally generated facade and ground textures."""
+
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -16,8 +18,8 @@ GLASS = (92, 108, 124)
 CONCRETE = (150, 150, 146)
 BEIGE = (226, 220, 206)
 ROOF = (140, 140, 136)
-RED = (172, 36, 50)              # IU red grid frame
-RED_SHADE = (138, 26, 40)        # inner face of the frame (depth cue)
+RED = (160, 34, 50)              # IU red grid frame
+RED_SHADE = (128, 24, 38)        # inner face of the frame (depth cue)
 RECESS = (206, 204, 198)         # shadowed edge of the recessed white bay
 WOOD = (122, 74, 42)
 WIN_FRAME = (226, 224, 218)       # white aluminium window frame

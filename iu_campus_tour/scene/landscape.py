@@ -2,9 +2,9 @@ import json
 import math
 import numpy as np
 from scene.geometry2d import rings_to_edges
-RADIUS = {"tree": 2.6, "small": 1.5, "shrub": 0.7}
+RADIUS = {"tree": 2.6, "small": 1.5, "shrub": 0.7, "palm": 1.8}
 # Max horizontal canopy reach (see graphics/vegetation.make_plant) + small gap, so leaves never poke into walls.
-CANOPY = {"tree": 3.6, "small": 1.9, "shrub": 0.9}
+CANOPY = {"tree": 3.6, "small": 1.9, "shrub": 0.9, "palm": 3.3}
 def load_landscape(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -179,7 +179,7 @@ def generate_vegetation(spec, constraints, roads, road_styles, bounds, existing_
         cands = road_side_points(roads, road_styles, float(street.get("spacing", 14.0)),
                                  (x0 - m, z0 - m, x1 + m, z1 + m), float(street.get("offset", 2.4)))
         cands = cands[rng.permutation(len(cands))] if len(cands) else cands
-        stats["street"] = pl.add(cands, {"tree": 0.75, "small": 0.25}, "street", int(street.get("max", 120)),
+        stats["street"] = pl.add(cands, street.get("kinds", {"tree": 0.5, "small": 0.2, "palm": 0.3}), "street", int(street.get("max", 120)),
                                  wall=4.0, road=1.2, tour=2.5)
     per = spec.get("perimeter", {})
     if per.get("enabled", True):

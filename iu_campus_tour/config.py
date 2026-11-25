@@ -12,7 +12,7 @@ GL_MINOR = 3
 GL_ERROR_CHECKING = True
 
 # Render
-CLEAR_COLOR = (0.53, 0.81, 0.92, 1.0)   
+CLEAR_COLOR = (0.53, 0.81, 0.92, 1.0)   #
 FPS_CAP = 0            
 FPS_TITLE_INTERVAL = 0.5  
 
@@ -36,9 +36,10 @@ SKYBOX_DIR = ASSET_DIR / "skybox"
 SUN_AZIMUTH = 160.0     
 SUN_ELEVATION = 35.0   
 SUN_COLOR = (1.0, 0.95, 0.85)
-SUN_INTENSITY = 1.0
-AMBIENT_COLOR = (0.25, 0.28, 0.35)   
-DAY_CYCLE_SPEED = 6.0   # deg/s when T is on -> one full day every 60 s
+SUN_INTENSITY = 0.85
+AMBIENT_COLOR = (0.46, 0.46, 0.48)   # sky fill light: shaded facades stay bright as in real photos
+DAY_LENGTH_SECONDS = 240.0   # automatic day/night cycle: one full sun circle
+NIGHT_SPEED_FACTOR = 3.0     # nights pass faster than days
 
 # Shadow mapping
 SHADOW_MAP_SIZE = 2048
@@ -55,6 +56,7 @@ PLAYER_HEAD_GAP = 0.2
 TOUR_SPEED = 3.5         # m/s
 TOUR_LOOK_AHEAD = 6.0    
 TOUR_LOOK_SMOOTH = 3.0   
+# (x, y, z).These points avoid 4 houses ;
 TOUR_WAYPOINTS = [
     (0, 1.7, 15), (-15, 1.7, 0), (-15, 1.7, -22), (0, 4.0, -26),
     (15, 1.7, -22), (15, 1.7, 0), (10, 1.7, 20),
