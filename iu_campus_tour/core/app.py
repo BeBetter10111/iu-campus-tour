@@ -17,6 +17,7 @@ from scene.campus import build_campus
 from scene.collision import CollisionWorld
 from scene.light import DirectionalLight
 from scene.path import CatmullRomPath
+from scene.places import load_places, place_in_view, place_for_key, teleport_pose
 from scene.skybox import Skybox
 from scene.tour import TourController
 
@@ -66,10 +67,16 @@ class App:
         ], font_size=30, min_size=(560, 300))
         self.hud_tex = None
         self._hud_key = None
-        self.free_hint_tex = self.overlay.make_text_texture([
+        self.places = load_places(config.ASSET_DIR / "data" / "places.json")
+        self._label, self._label_tex = None, {}
+        hint = [
             "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
-            "M menu   B Phong/Blinn   N bóng   F2 debug",
-        ], title=False, font_size=20, pad=14)
+            "M menu   B Phong/Blinn   N bóng   F2 debug   Phím mũi tên: mặt trời",
+        ]
+        keyed = [p for p in self.places if p.get("key")]
+        if keyed:
+            hint.append("Dịch chuyển:  " + "   ".join(f"{p['key']} {p['short']}" for p in keyed))
+        self.free_hint_tex = self.overlay.make_text_texture(hint, title=False, font_size=20, pad=14)
 
         self.use_blinn = False
         self.shadows_on = True
@@ -105,6 +112,15 @@ class App:
         self.camera.position[:] = self.SPAWN_POS
         self.camera.yaw, self.camera.pitch = self.SPAWN_YAW, 0.0
         self.camera._update_vectors()
+
+    def _teleport(self, place):
+        height_at = getattr(self.scene, "height_at", None)
+        pose = teleport_pose(place, self.collision.collides,
+                             lambda x, z: (height_at(x, z) if height_at else 0.0) + config.EYE_HEIGHT)
+        if pose:
+            self.camera.position[:] = pose[0]
+            self.camera.yaw, self.camera.pitch = pose[1], 0.0
+            self.camera._update_vectors()
 
     def _set_mouse_capture(self, enabled):
         self.mouse_captured = enabled
@@ -160,6 +176,10 @@ class App:
                 self._set_mouse_capture(not self.mouse_captured)
             elif key == pygame.K_g:
                 self.camera.fly_mode = not self.camera.fly_mode
+            else:
+                place = place_for_key(self.places, pygame.key.name(key).strip("[]"))
+                if place:
+                    self._teleport(place)
 
         if key == pygame.K_b:
             self.use_blinn = not self.use_blinn
@@ -170,6 +190,9 @@ class App:
         elif key == pygame.K_F2:
             self.debug_mode = (self.debug_mode + 1) % 3
             print("Debug mode:", ("normal", "shadow factor", "normals")[self.debug_mode])
+        elif key == pygame.K_p:
+            print(f"SUN_AZIMUTH = {self.light.azimuth:.0f}, "
+                  f"SUN_ELEVATION = {self.light.elevation:.0f}")
 
     def _update(self, dt):
         keys = pygame.key.get_pressed()
@@ -193,8 +216,15 @@ class App:
             pygame.mouse.get_rel()
             self.tour.update(self.camera, dt)
 
-        self.light.advance(dt)
+        if self.mode != Mode.MENU:
+            d_az = (int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])) * 40.0 * dt
+            d_el = (int(keys[pygame.K_UP]) - int(keys[pygame.K_DOWN])) * 40.0 * dt
+            if d_az or d_el:
+                self.light.set_angles(self.light.azimuth + d_az, self.light.elevation + d_el)
+
         self._shadow_dirty |= self.light.update(self.camera.position)
+        self._label = (place_in_view(self.places, self.camera.position, self.camera.front)
+                       if self.mode != Mode.MENU else None)
 
     def _render_shadow_pass(self):
         self.shadow_map.begin()
@@ -257,3 +287,11 @@ class App:
                     "SPACE tạm dừng   +/- tốc độ   M menu",
                 ], title=False, font_size=20, pad=14)
             self.overlay.draw_at(self.hud_tex, w, h, anchor="topleft")
+
+        if self._label is not None and self.mode != Mode.MENU:
+            key = self._label["name_vi"]
+            if key not in self._label_tex:
+                self._label_tex[key] = self.overlay.make_text_texture(
+                    [f"{key} - {self._label['name_en']}", self._label.get("info", "")],
+                    font_size=24, pad=16)
+            self.overlay.draw_at(self._label_tex[key], w, h, anchor="topcenter")

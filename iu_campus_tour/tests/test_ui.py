@@ -36,13 +36,14 @@ class OverlayTests(unittest.TestCase):
         draw = Mock()
         self.overlay.draw = draw
 
-        for anchor in ("center", "bottomleft", "topleft"):
+        for anchor in ("center", "bottomleft", "topleft", "topcenter"):
             self.overlay.draw_at(texture, 1000, 500, anchor=anchor)
 
         draw.assert_has_calls([
             call(texture, (-0.2, -0.2, 0.4, 0.4)),
             call(texture, (-0.96, -0.92, 0.4, 0.4)),
             call(texture, (-0.96, 0.52, 0.4, 0.4)),
+            call(texture, (-0.2, 0.52, 0.4, 0.4)),
         ])
 
 

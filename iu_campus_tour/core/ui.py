@@ -84,6 +84,8 @@ class Overlay:
             x, y = left, bottom
         elif anchor == "topleft":
             x, y = left, 1 - height - 2 * margin / screen_height
+        elif anchor == "topcenter":
+            x, y = -width / 2, 1 - height - 2 * margin / screen_height
         else:
             raise ValueError(f"Unsupported overlay anchor: {anchor}")
 
