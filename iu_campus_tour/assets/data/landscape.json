@@ -119,9 +119,10 @@
       ],
       "density": 10.0,
       "kinds": {
-        "tree": 0.35,
-        "small": 0.4,
-        "shrub": 0.25
+        "tree": 0.3,
+        "small": 0.35,
+        "shrub": 0.25,
+        "palm": 0.1
       },
       "wall_clearance": 0.8,
       "tour_clearance": 1.6
@@ -148,9 +149,10 @@
       ],
       "density": 10.0,
       "kinds": {
-        "tree": 0.35,
-        "small": 0.4,
-        "shrub": 0.25
+        "tree": 0.3,
+        "small": 0.35,
+        "shrub": 0.25,
+        "palm": 0.1
       },
       "wall_clearance": 0.8,
       "tour_clearance": 1.6
@@ -177,9 +179,10 @@
       ],
       "density": 4.0,
       "kinds": {
-        "tree": 0.6,
-        "small": 0.25,
-        "shrub": 0.15
+        "tree": 0.45,
+        "small": 0.2,
+        "shrub": 0.1,
+        "palm": 0.25
       },
       "wall_clearance": 2.0
     }
@@ -193,12 +196,13 @@
   },
   "perimeter": {
     "enabled": true,
-    "count": 220,
+    "count": 140,
     "margin": 90.0,
     "falloff": 60.0,
     "kinds": {
-      "tree": 0.7,
-      "small": 0.3
+      "tree": 0.55,
+      "small": 0.25,
+      "palm": 0.2
     },
     "wall_clearance": 5.0
   },

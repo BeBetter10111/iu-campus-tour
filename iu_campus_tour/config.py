@@ -56,7 +56,6 @@ PLAYER_HEAD_GAP = 0.2
 TOUR_SPEED = 3.5         # m/s
 TOUR_LOOK_AHEAD = 6.0    
 TOUR_LOOK_SMOOTH = 3.0   
-# (x, y, z).These points avoid 4 houses ;
 TOUR_WAYPOINTS = [
     (0, 1.7, 15), (-15, 1.7, 0), (-15, 1.7, -22), (0, 4.0, -26),
     (15, 1.7, -22), (15, 1.7, 0), (10, 1.7, 20),
