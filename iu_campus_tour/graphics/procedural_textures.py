@@ -1,5 +1,3 @@
-"""Procedurally generated facade and ground textures."""
-
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -18,12 +16,6 @@ GLASS = (92, 108, 124)
 CONCRETE = (150, 150, 146)
 BEIGE = (226, 220, 206)
 ROOF = (140, 140, 136)
-RED = (160, 34, 50)              # IU red grid frame
-RED_SHADE = (128, 24, 38)        # inner face of the frame (depth cue)
-RECESS = (206, 204, 198)         # shadowed edge of the recessed white bay
-WOOD = (122, 74, 42)
-WIN_FRAME = (226, 224, 218)       # white aluminium window frame
-WARM_GLASS = (184, 136, 82)      # amber glass / curtains seen from outside
 
 
 def _px(m):
@@ -42,46 +34,19 @@ def _window(d, cx, cy, w, h, glass=GLASS, frame=FRAME, surround=None, surround_p
     d.line((_px(cx - w / 2 + 0.09), H - _px(cy), _px(cx + w / 2 - 0.09), H - _px(cy)), fill=frame, width=2)
 
 
-def _pane_window(d, x0, y0, x1, y1, cols=2, rows=2, frame=WOOD, glass=WARM_GLASS, bar=0.07):
-    """Wood-framed window (pixel box, top-left origin) with mullions and a light-to-dark glass gradient."""
-    d.rectangle((x0, y0, x1, y1), fill=frame)
-    b = max(2, _px(bar))
-    gx0, gy0, gx1, gy1 = x0 + b, y0 + b, x1 - b, y1 - b
-    for k in range(gy1 - gy0 + 1):
-        t = k / max(gy1 - gy0, 1)
-        c = tuple(int(g * (0.80 + 0.30 * t)) for g in glass)
-        d.line((gx0, gy0 + k, gx1, gy0 + k), fill=c)
-    for i in range(1, cols):
-        x = gx0 + (gx1 - gx0) * i // cols
-        d.rectangle((x - b // 2, gy0, x + b // 2, gy1), fill=frame)
-    for j in range(1, rows):
-        y = gy0 + (gy1 - gy0) * j // rows
-        d.rectangle((gx0, y - b // 2, gx1, y + b // 2), fill=frame)
-
-
 def _make(kind):
     W, H = _px(TILE_W), _px(FLOOR_H)
     if kind == "maroon":
-        # Red structural grid (piers + floor slab) framing recessed white bays, one wood window per bay.
-        img = Image.new("RGB", (W, H), RED)
+        img = Image.new("RGB", (W, H), MAROON)
         d = ImageDraw.Draw(img)
-        bay, pier, slab = FLOOR_H, _px(0.42), _px(0.80)
         for i in range(3):
-            x0, x1 = _px(i * bay) + pier, _px((i + 1) * bay) - pier
-            y0, y1 = 0, H - slab
-            d.rectangle((x0 - _px(0.08), y0, x1 + _px(0.08), y1 + _px(0.08)), fill=RED_SHADE)
-            d.rectangle((x0, y0, x1, y1), fill=WHITE)
-            d.rectangle((x0, y0, x1, y0 + _px(0.18)), fill=RECESS)
-            d.rectangle((x0, y0, x0 + _px(0.12), y1), fill=RECESS)
-            _pane_window(d, x0 + _px(0.35), _px(0.45), x0 + _px(1.95), H - slab - _px(0.45), frame=WIN_FRAME)
+            _window(d, (i + 0.5) * FLOOR_H, FLOOR_H * 0.52, 1.5, 1.4, surround=WHITE)
     elif kind == "white":
-        # White block with red floor bands and wide wood-framed ribbon windows.
         img = Image.new("RGB", (W, H), WHITE)
         d = ImageDraw.Draw(img)
-        d.rectangle((0, H - _px(0.38), W, H), fill=RED)
+        d.rectangle((0, H - _px(0.14), W, H), fill=MAROON_BAND)
         for i in range(3):
-            cx = (i + 0.5) * FLOOR_H
-            _pane_window(d, _px(cx - 1.05), _px(1.05), _px(cx + 1.05), H - _px(1.15), cols=4, rows=2, frame=WIN_FRAME)
+            _window(d, (i + 0.5) * FLOOR_H, FLOOR_H * 0.5, 1.7, 1.25)
     elif kind == "concrete":
         img = Image.new("RGB", (W, H), CONCRETE)
         d = ImageDraw.Draw(img)
@@ -146,6 +111,7 @@ ASPHALT_TILE = 4.0
 MARKED_TILE = 8.0
 PAVING_TILE = 2.0
 CONCRETE_TILE = 4.0
+SIDEWALK_TILE = 2.0
 
 
 def _periodic_noise(size, beta, rng):
@@ -217,9 +183,34 @@ def concrete_array(size=256, seed=3):
     return _to_rgba(rgb)
 
 
+def sidewalk_array(size=256, seed=9):
+    """Generate a terracotta pavement texture with the scroll pattern common on Vietnamese sidewalks."""
+    rng = np.random.default_rng(seed)
+    cells = 8
+    step = size // cells
+    img = Image.new("RGB", (size, size), (176, 100, 94))
+    d = ImageDraw.Draw(img)
+    for cy in range(cells):
+        for cx in range(cells):
+            x0, y0 = cx * step, cy * step
+            shade = int(rng.normal(0, 4))
+            base = (178 + shade, 102 + shade, 96 + shade)
+            d.rectangle((x0, y0, x0 + step, y0 + step), fill=base)
+            light = (198 + shade, 128 + shade, 118 + shade)
+            flip = (cx + cy) % 2
+            box = (x0 - step // 2, y0 - step // 2, x0 + step // 2, y0 + step // 2) if flip else \
+                  (x0 + step // 2, y0 + step // 2, x0 + step * 3 // 2, y0 + step * 3 // 2)
+            d.arc(box, 0, 360, fill=light, width=2)
+            inner = tuple(v + (step // 6 if k < 2 else -step // 6) for k, v in enumerate(box))
+            d.arc(inner, 0, 360, fill=light, width=1)
+            d.rectangle((x0, y0, x0 + step - 1, y0 + step - 1), outline=(150, 82, 78))
+    arr = np.asarray(img, dtype=np.float64) + _periodic_noise(size, 0.4, rng)[..., None] * 3
+    return _to_rgba(arr)
+
+
 _GROUND = {"grass": lambda: grass_array(), "asphalt": lambda: asphalt_array(),
            "asphalt_marked": lambda: asphalt_array(marked=True), "paving": lambda: paving_array(),
-           "concrete": lambda: concrete_array()}
+           "concrete": lambda: concrete_array(), "sidewalk": lambda: sidewalk_array()}
 _ground_cache = {}
 
 
@@ -244,8 +235,8 @@ def ground_texture(kind):
 
 
 FOLIAGE_SHADES = 8
-_FOLIAGE_RGB = [(70, 122, 44), (96, 150, 52), (122, 170, 62), (82, 136, 58),
-                (146, 186, 74), (60, 110, 48), (108, 158, 70), (132, 176, 56)]
+_FOLIAGE_RGB = [(52, 104, 44), (64, 118, 48), (78, 132, 54), (58, 110, 62),
+                (88, 138, 58), (46, 94, 52), (72, 124, 66), (96, 142, 62)]
 _veg_cache = {}
 
 
@@ -265,7 +256,7 @@ def foliage_array(size=128):
 def trunk_array(size=32):
     rng = np.random.default_rng(22)
     vv = np.linspace(0.75, 1.1, size)[:, None, None]
-    rgb = np.array([112, 92, 72], float)[None, None, :] * vv * np.ones((1, size, 1))
+    rgb = np.array([104, 76, 52], float)[None, None, :] * vv * np.ones((1, size, 1))
     return _to_rgba(rgb + rng.normal(0, 4, rgb.shape))
 
 

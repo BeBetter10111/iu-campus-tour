@@ -5,14 +5,16 @@ import config
 from graphics.extrude import extrude_arrays, signed_area
 from graphics.mesh import Mesh, create_box
 from graphics.procedural_textures import (facade_texture, ground_texture as make_ground_texture, FLOOR_H, TILE_W,
-                                          GRASS_TILE, ASPHALT_TILE, MARKED_TILE, PAVING_TILE, CONCRETE_TILE)
+                                          GRASS_TILE, ASPHALT_TILE, MARKED_TILE, PAVING_TILE, CONCRETE_TILE, SIDEWALK_TILE)
 from graphics.roads import polyline_strip, polygon_flat, merge_meshes
 from graphics.vegetation import build_plants
-from graphics.fence import fence_for_polygon, oriented_box
+from graphics.fence import fence_for_polygon, oriented_box, perimeter_fence, gates_from_roads
 from graphics.stairs import Stair, stairs_mesh
-from graphics.furniture import place_benches, benches_mesh, pergolas_mesh
+from graphics.furniture import place_benches, benches_mesh
 from scene.geometry2d import rings_to_edges, circle_hits_rings, point_in_edges
 from scene.scene import Scene, SceneObject
+from scene import road_fit
+from scene.sidewalks import build_sidewalks
 DATA_DIR = getattr(config, "DATA_DIR", config.ASSET_DIR / "data")
 ROAD_STYLE = {
     "tertiary":      ("asphalt_marked", 8.5, 0.030, MARKED_TILE, True),
@@ -29,6 +31,8 @@ ROAD_STYLE = {
 PARKING_Y = 0.040
 PAVED_Y = 0.064
 ROAD_MARGIN = 300.0
+# Roads that may carry a gate in the campus fence (public streets run outside the fence).
+GATE_KINDS = {"service", "residential", "unclassified", "track", "cycleway", "pedestrian", "footway", "path"}
 RAISED_MIN = 2.5
 ROOF_ONLY_KINDS = {"roof", "carport", "canopy"}
 SPAWN_CLEARANCE = 6.0
@@ -301,6 +305,15 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
         if geo["forced"] or geo["holes_ignored"]:
             report.append(f"  {label}: " + ("có lỗ/sân trong (mái phủ kín lỗ) " if geo["holes_ignored"] else "")
                           + (f"{geo['forced']} lần cắt tai ép (đường viền suy biến)" if geo["forced"] else ""))
+    fit_cfg = landscape.get("road_fit", {})
+    if fit_cfg.get("enabled", True):
+        road_fit.WIDE_KINDS_CLEARANCE = float(fit_cfg.get("clearance", road_fit.WIDE_KINDS_CLEARANCE))
+        road_fit.NARROW_CLEARANCE = float(fit_cfg.get("footway_clearance", road_fit.NARROW_CLEARANCE))
+        fitted, fit_rep = road_fit.fit_roads(data.get("roads", []), styles, obstacle_edges,
+                                             max_push=float(fit_cfg.get("max_push", road_fit.MAX_PUSH)))
+        data = {**data, "roads": fitted}
+        print(f"[OSM] đường tránh tòa nhà: {fit_rep['moved']} đường dịch ra, {fit_rep['cut']} đường bị cắt "
+              f"(đã kiểm tra {fit_rep['checked']})")
     if frame_parts:
         fv, fi = merge_meshes(frame_parts)
         scene.add(_make_object(Mesh(fv, fi), facade_texture("fence"), cast_shadow=False, specular=0.2, shininess=24.0))
@@ -345,6 +358,24 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
                 obj = _make_object(Mesh(cv, ci), facade_texture("stone"), specular=0.05)
                 obj.collider_boxes = np.array(boxes_c, np.float32)
                 scene.add(obj)
+    boundary = landscape.get("campus_boundary") or {}
+    if boundary.get("polygon") and boundary.get("fence", True):
+        gates = list(boundary.get("gates", []))
+        if boundary.get("auto_gates", True):
+            gates += gates_from_roads(boundary["polygon"], data.get("roads", []), styles, kinds=GATE_KINDS)
+        (solid, bars), boxes, rep = perimeter_fence(boundary["polygon"], gates,
+                                                    height=float(boundary.get("height", 2.0)))
+        if solid is not None:
+            obj = _make_object(Mesh(*solid), facade_texture("stone"), specular=0.05)
+            obj.collider_boxes = boxes
+            scene.add(obj)
+        if bars is not None:
+            scene.add(_make_object(Mesh(*bars), facade_texture("fence"), cast_shadow=False, specular=0.25,
+                                   shininess=32.0))
+        print(f"[OSM] hàng rào khuôn viên: {len(boundary['polygon'])} đỉnh, {sum(1 for r in rep if r['ok'])} cổng")
+        for r in rep:
+            if not r["ok"]:
+                report.append(f"  cổng hàng rào tại {tuple(round(c, 1) for c in r['at'])} cách rào quá xa, bỏ qua")
     all_pts = np.array([p for b in active for p in b["outer"]], dtype=np.float64)
     extra_paving, paved_edges = [], [rings_to_edges([s.footprint()]) for s in stairs]
     if len(all_pts):
@@ -359,7 +390,13 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
                 s0 = stair.depth if stair is not None else 0.0
                 o = np.array(d["at"], float) + n_ * s0
                 hit = ray_road_hit(o, n_, segs, float(dp.get("max_length", 30.0)))
-                length = hit + 0.3 if hit is not None else float(dp.get("default_length", 8.0))
+                if hit is None:
+                    length = float(dp.get("default_length", 8.0))
+                elif landscape.get("sidewalks", {}).get("enabled", True):
+                    # stop at the sidewalk instead of spilling over the kerb onto the asphalt
+                    length = hit - float(dp.get("sidewalk_inset", 1.4))
+                else:
+                    length = hit + 0.3
                 if length < 0.6:
                     continue
                 wp = d["width"] + float(dp.get("extra_width", 2.5))
@@ -377,20 +414,6 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
                 avoid = [(x_, z_, bn.get("door_clearance", 4.0)) for x_, z_, _, _ in door_points] \
                     + [tuple(a) for a in bn.get("avoid", [])]
                 bench_placements += place_benches(area["polygon"], int(bn["count"]), float(bn.get("min_spacing", 9.0)), avoid, rng_b)
-            pg = area.get("pergolas")
-            if pg and pg.get("at"):
-                poly = np.asarray(area["polygon"], float)
-                lo_, hi_ = poly.min(axis=0), poly.max(axis=0)
-                along_x = (hi_[0] - lo_[0]) >= (hi_[1] - lo_[1])
-                mid = (lo_ + hi_) / 2
-                spots = [(float(a), float(mid[1]), 0.0) if along_x else (float(mid[0]), float(a), math.pi / 2)
-                         for a in pg["at"]]
-                (pv, pi_), pboxes = pergolas_mesh(spots, width=float(pg.get("width", 3.0)),
-                                                  depth=float(pg.get("depth", 2.2)), height=float(pg.get("height", 2.8)))
-                obj = _make_object(Mesh(pv, pi_), facade_texture("stair"), specular=0.10, shininess=16.0)
-                obj.collider_boxes = pboxes
-                scene.add(obj)
-                print(f"[OSM] {len(spots)} giàn hoa trên lối đi")
         if bench_placements:
             (bv, bi), bboxes = benches_mesh(bench_placements)
             obj = _make_object(Mesh(bv, bi), facade_texture("stone"), specular=0.08, shininess=16.0)
@@ -400,6 +423,23 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
             print(f"[OSM] {len(bench_placements)} ghế đá (mỗi ghế 3 chỗ ngồi)")
         n_roads, n_groups = add_ground_layers(scene, data, bounds_all, styles, extra_concrete, extra_paving)
         print(f"[OSM] đã trải {n_roads} đường/lối đi/bãi xe ({n_groups} nhóm texture); {len(stairs)} cầu thang")
+        sw_cfg = landscape.get("sidewalks", {})
+        if sw_cfg.get("enabled", True):
+            if boundary.get("polygon"):
+                bp = np.asarray(boundary["polygon"], float)
+                m_ = float(sw_cfg.get("margin", 120.0))
+                sw_bounds = (bp[:, 0].min() - m_, bp[:, 1].min() - m_, bp[:, 0].max() + m_, bp[:, 1].max() + m_)
+            else:
+                sw_bounds = bounds_all
+            walk, kerb, sw_stat = build_sidewalks(data.get("roads", []), styles, obstacle_edges, parking_edges,
+                                                  sw_bounds, sw_cfg, tile_walk=SIDEWALK_TILE, tile_kerb=CONCRETE_TILE)
+            if walk is not None:
+                scene.add(_make_object(Mesh(*walk), make_ground_texture("sidewalk"), cast_shadow=False,
+                                       collidable=False, specular=0.04, shininess=10.0))
+            if kerb is not None:
+                scene.add(_make_object(Mesh(*kerb), make_ground_texture("concrete"), cast_shadow=False,
+                                       collidable=False, specular=0.04, shininess=10.0))
+            print(f"[OSM] vỉa hè + lề đường: {sw_stat['runs']} đoạn, dài {sw_stat['length']:.0f} m")
     scene.tour_waypoints, scene.tour_info = None, None
     if tour_spec:
         try:

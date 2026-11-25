@@ -45,3 +45,30 @@ def nearest_on_edges(px, pz, edges):
     d2 = (px - cx) ** 2 + (pz - cz) ** 2
     k = int(np.argmin(d2))
     return float(np.sqrt(d2[k])), float(cx[k]), float(cz[k])
+
+
+def points_in_edges(pts, edges):
+    """Vectorized point-in-polygon test: ``pts`` (n, 2) against one ring's edges."""
+    pts = np.asarray(pts, dtype=np.float64).reshape(-1, 2)
+    if len(edges) == 0 or len(pts) == 0:
+        return np.zeros(len(pts), bool)
+    x0, z0, x1, z1 = edges.T
+    px, pz = pts[:, 0:1], pts[:, 1:2]
+    crosses = (z0[None, :] > pz) != (z1[None, :] > pz)
+    dz = np.where(z1 != z0, z1 - z0, 1.0)
+    x_at = x0[None, :] + (pz - z0[None, :]) * (x1 - x0)[None, :] / dz[None, :]
+    return (np.count_nonzero(crosses & (px < x_at), axis=1) % 2).astype(bool)
+
+
+def dist_points_edges(pts, edges):
+    """Vectorized distance from points (n, 2) to the nearest edge (n,)."""
+    pts = np.asarray(pts, dtype=np.float64).reshape(-1, 2)
+    if len(edges) == 0 or len(pts) == 0:
+        return np.full(len(pts), np.inf)
+    x0, z0, x1, z1 = edges.T
+    abx, abz = x1 - x0, z1 - z0
+    denom = np.maximum(abx * abx + abz * abz, 1e-12)
+    px, pz = pts[:, 0:1], pts[:, 1:2]
+    t = np.clip(((px - x0) * abx + (pz - z0) * abz) / denom, 0.0, 1.0)
+    cx, cz = x0 + t * abx, z0 + t * abz
+    return np.sqrt(((px - cx) ** 2 + (pz - cz) ** 2).min(axis=1))
