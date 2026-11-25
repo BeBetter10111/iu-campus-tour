@@ -165,7 +165,7 @@
     "way/490258283": {
       "levels": 4,
       "min_levels": 2,
-      "facade": "maroon",
+      "facade": "white",
       "note": "Khoi hep phia DONG (119 m2): chi la CAU NOI giua A1 va A2 o tang 3-4 (theo xac nhan cua ban) -> nang len tu 7.2 m den 14.4 m, ben duoi di bo xuyen qua. Quy uoc tang 1 = tang tret; neu 'tang 3-4' cua ban la lau 3-4 (tinh tu tren tang tret) thi doi min_levels=3, levels=5. Nang theo +0.9 m cung A1/A2 (khong co be).",
       "lift": 0.9,
       "plinth": false

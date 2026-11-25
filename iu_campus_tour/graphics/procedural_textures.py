@@ -1,5 +1,3 @@
-"""Procedurally generated facade and ground textures."""
-
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -18,6 +16,12 @@ GLASS = (92, 108, 124)
 CONCRETE = (150, 150, 146)
 BEIGE = (226, 220, 206)
 ROOF = (140, 140, 136)
+RED = (172, 36, 50)              # IU red grid frame
+RED_SHADE = (138, 26, 40)        # inner face of the frame (depth cue)
+RECESS = (206, 204, 198)         # shadowed edge of the recessed white bay
+WOOD = (122, 74, 42)
+WIN_FRAME = (226, 224, 218)       # white aluminium window frame
+WARM_GLASS = (184, 136, 82)      # amber glass / curtains seen from outside
 
 
 def _px(m):
@@ -36,19 +40,46 @@ def _window(d, cx, cy, w, h, glass=GLASS, frame=FRAME, surround=None, surround_p
     d.line((_px(cx - w / 2 + 0.09), H - _px(cy), _px(cx + w / 2 - 0.09), H - _px(cy)), fill=frame, width=2)
 
 
+def _pane_window(d, x0, y0, x1, y1, cols=2, rows=2, frame=WOOD, glass=WARM_GLASS, bar=0.07):
+    """Wood-framed window (pixel box, top-left origin) with mullions and a light-to-dark glass gradient."""
+    d.rectangle((x0, y0, x1, y1), fill=frame)
+    b = max(2, _px(bar))
+    gx0, gy0, gx1, gy1 = x0 + b, y0 + b, x1 - b, y1 - b
+    for k in range(gy1 - gy0 + 1):
+        t = k / max(gy1 - gy0, 1)
+        c = tuple(int(g * (0.80 + 0.30 * t)) for g in glass)
+        d.line((gx0, gy0 + k, gx1, gy0 + k), fill=c)
+    for i in range(1, cols):
+        x = gx0 + (gx1 - gx0) * i // cols
+        d.rectangle((x - b // 2, gy0, x + b // 2, gy1), fill=frame)
+    for j in range(1, rows):
+        y = gy0 + (gy1 - gy0) * j // rows
+        d.rectangle((gx0, y - b // 2, gx1, y + b // 2), fill=frame)
+
+
 def _make(kind):
     W, H = _px(TILE_W), _px(FLOOR_H)
     if kind == "maroon":
-        img = Image.new("RGB", (W, H), MAROON)
+        # Red structural grid (piers + floor slab) framing recessed white bays, one wood window per bay.
+        img = Image.new("RGB", (W, H), RED)
         d = ImageDraw.Draw(img)
+        bay, pier, slab = FLOOR_H, _px(0.42), _px(0.80)
         for i in range(3):
-            _window(d, (i + 0.5) * FLOOR_H, FLOOR_H * 0.52, 1.5, 1.4, surround=WHITE)
+            x0, x1 = _px(i * bay) + pier, _px((i + 1) * bay) - pier
+            y0, y1 = 0, H - slab
+            d.rectangle((x0 - _px(0.08), y0, x1 + _px(0.08), y1 + _px(0.08)), fill=RED_SHADE)
+            d.rectangle((x0, y0, x1, y1), fill=WHITE)
+            d.rectangle((x0, y0, x1, y0 + _px(0.18)), fill=RECESS)
+            d.rectangle((x0, y0, x0 + _px(0.12), y1), fill=RECESS)
+            _pane_window(d, x0 + _px(0.35), _px(0.45), x0 + _px(1.95), H - slab - _px(0.45), frame=WIN_FRAME)
     elif kind == "white":
+        # White block with red floor bands and wide wood-framed ribbon windows.
         img = Image.new("RGB", (W, H), WHITE)
         d = ImageDraw.Draw(img)
-        d.rectangle((0, H - _px(0.14), W, H), fill=MAROON_BAND)
+        d.rectangle((0, H - _px(0.38), W, H), fill=RED)
         for i in range(3):
-            _window(d, (i + 0.5) * FLOOR_H, FLOOR_H * 0.5, 1.7, 1.25)
+            cx = (i + 0.5) * FLOOR_H
+            _pane_window(d, _px(cx - 1.05), _px(1.05), _px(cx + 1.05), H - _px(1.15), cols=4, rows=2, frame=WIN_FRAME)
     elif kind == "concrete":
         img = Image.new("RGB", (W, H), CONCRETE)
         d = ImageDraw.Draw(img)
@@ -211,8 +242,8 @@ def ground_texture(kind):
 
 
 FOLIAGE_SHADES = 8
-_FOLIAGE_RGB = [(52, 104, 44), (64, 118, 48), (78, 132, 54), (58, 110, 62),
-                (88, 138, 58), (46, 94, 52), (72, 124, 66), (96, 142, 62)]
+_FOLIAGE_RGB = [(70, 122, 44), (96, 150, 52), (122, 170, 62), (82, 136, 58),
+                (146, 186, 74), (60, 110, 48), (108, 158, 70), (132, 176, 56)]
 _veg_cache = {}
 
 
@@ -232,7 +263,7 @@ def foliage_array(size=128):
 def trunk_array(size=32):
     rng = np.random.default_rng(22)
     vv = np.linspace(0.75, 1.1, size)[:, None, None]
-    rgb = np.array([104, 76, 52], float)[None, None, :] * vv * np.ones((1, size, 1))
+    rgb = np.array([112, 92, 72], float)[None, None, :] * vv * np.ones((1, size, 1))
     return _to_rgba(rgb + rng.normal(0, 4, rgb.shape))
 
 

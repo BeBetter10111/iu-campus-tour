@@ -19,7 +19,7 @@ def _orient(verts, idx):
     return verts, idx
 
 
-def sphere_part(cx, cy, cz, r, sy=1.0, shade=0, seg=8, rings=5):
+def sphere_part(cx, cy, cz, r, sy=1.0, shade=0, seg=9, rings=6):
     verts = []
     u = (shade % NSHADES + 0.5) / NSHADES
     for i in range(rings + 1):
@@ -56,23 +56,29 @@ def trunk_part(cx, cz, h, r0, r1, sides=6):
 
 
 def make_plant(x, z, kind, rng):
+    """Tropical-looking plant: trunk + a loose cluster of foliage clumps (max reach ~1.15 R)."""
     lo, hi = TREE_KINDS[kind]
     H = float(rng.uniform(lo, hi))
+    shade = int(rng.integers(0, NSHADES))
     if kind == "shrub":
         R = H * 0.5
-        shade = int(rng.integers(0, NSHADES))
-        canopy = sphere_part(x, 0.55 * R, z, R, sy=0.75, shade=shade)
-        return None, canopy, None
+        parts = [sphere_part(x, 0.5 * R, z, 0.8 * R, sy=0.75, shade=shade)]
+        for _ in range(int(rng.integers(2, 4))):
+            a = float(rng.uniform(0, 2 * math.pi))
+            parts.append(sphere_part(x + 0.3 * R * math.cos(a), 0.45 * R, z + 0.3 * R * math.sin(a),
+                                     0.6 * R, sy=0.8, shade=shade + int(rng.integers(-1, 2))))
+        return None, merge_meshes(parts), None
 
-    shade = int(rng.integers(0, NSHADES))
-    trunk_h = 0.5 * H
-    R = 0.30 * H
-    trunk = trunk_part(x, z, trunk_h + 0.4 * R, 0.17 + 0.018 * H, 0.10 + 0.010 * H)
-    parts = [sphere_part(x, trunk_h + 0.6 * R, z, R, sy=0.85, shade=shade)]
-    for _ in range(2):
-        ang = float(rng.uniform(0, 2 * math.pi))
-        parts.append(sphere_part(x + 0.55 * R * math.cos(ang), trunk_h + 0.3 * R, z + 0.55 * R * math.sin(ang),
-                                 0.7 * R, sy=0.85, shade=shade + int(rng.integers(-1, 2))))
+    trunk_h = float(rng.uniform(0.32, 0.44)) * H
+    R = 0.32 * H
+    trunk = trunk_part(x, z, trunk_h + 0.5 * R, 0.10 + 0.015 * H, 0.06 + 0.008 * H)
+    parts = [sphere_part(x, trunk_h + 0.55 * R, z, 0.72 * R, sy=0.78, shade=shade)]
+    for _ in range(int(rng.integers(4, 8))):
+        a = float(rng.uniform(0, 2 * math.pi))
+        d = float(rng.uniform(0.25, 0.55)) * R
+        parts.append(sphere_part(x + d * math.cos(a), trunk_h + float(rng.uniform(0.15, 0.95)) * R,
+                                 z + d * math.sin(a), float(rng.uniform(0.4, 0.6)) * R, sy=0.8,
+                                 shade=shade + int(rng.integers(-2, 3))))
     canopy = merge_meshes(parts)
     box = np.array([x - TRUNK_BOX_HALF, 0.0, z - TRUNK_BOX_HALF, x + TRUNK_BOX_HALF, TRUNK_BOX_HEIGHT, z + TRUNK_BOX_HALF])
     return trunk, canopy, box

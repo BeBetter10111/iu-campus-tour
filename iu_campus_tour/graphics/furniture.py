@@ -63,3 +63,31 @@ def benches_mesh(placements):
     parts = [pt for cx, cz, ang, bs in placements for pt in bench_parts(cx, cz, ang, bs)]
     boxes = np.array([bench_box(cx, cz, ang) for cx, cz, ang, _ in placements], np.float32).reshape(-1, 6)
     return merge_meshes(parts), boxes
+
+
+def pergola_parts(cx, cz, ang, width=3.0, depth=2.2, height=2.8, post=0.16):
+    """White garden arch over a walkway: 4 posts, 2 cross beams and roof slats. ang = walkway direction."""
+    al = np.array([math.cos(ang), math.sin(ang)])
+    ac = np.array([-math.sin(ang), math.cos(ang)])
+    c0 = np.array([cx, cz])
+    parts, boxes = [], []
+    for sa in (-1, 1):
+        for sc in (-1, 1):
+            p = c0 + al * sa * depth / 2 + ac * sc * width / 2
+            parts.append(oriented_box(p[0], p[1], 0.0, height, post, post, ang))
+            boxes.append([p[0] - post, 0.0, p[1] - post, p[0] + post, height, p[1] + post])
+        b = c0 + al * sa * depth / 2
+        parts.append(oriented_box(b[0], b[1], height, height + 0.16, 0.12, width + 0.5, ang))
+    for k in range(6):
+        s = c0 + ac * (-width / 2 - 0.2 + k * (width + 0.4) / 5)
+        parts.append(oriented_box(s[0], s[1], height + 0.16, height + 0.24, depth + 0.5, 0.07, ang))
+    return parts, boxes
+
+
+def pergolas_mesh(placements, **kw):
+    parts, boxes = [], []
+    for cx, cz, ang in placements:
+        p, b = pergola_parts(cx, cz, ang, **kw)
+        parts += p
+        boxes += b
+    return merge_meshes(parts), np.array(boxes, np.float32).reshape(-1, 6)

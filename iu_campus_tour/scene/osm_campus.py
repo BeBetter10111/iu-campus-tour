@@ -10,7 +10,7 @@ from graphics.roads import polyline_strip, polygon_flat, merge_meshes
 from graphics.vegetation import build_plants
 from graphics.fence import fence_for_polygon, oriented_box
 from graphics.stairs import Stair, stairs_mesh
-from graphics.furniture import place_benches, benches_mesh
+from graphics.furniture import place_benches, benches_mesh, pergolas_mesh
 from scene.geometry2d import rings_to_edges, circle_hits_rings, point_in_edges
 from scene.scene import Scene, SceneObject
 DATA_DIR = getattr(config, "DATA_DIR", config.ASSET_DIR / "data")
@@ -377,6 +377,20 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
                 avoid = [(x_, z_, bn.get("door_clearance", 4.0)) for x_, z_, _, _ in door_points] \
                     + [tuple(a) for a in bn.get("avoid", [])]
                 bench_placements += place_benches(area["polygon"], int(bn["count"]), float(bn.get("min_spacing", 9.0)), avoid, rng_b)
+            pg = area.get("pergolas")
+            if pg and pg.get("at"):
+                poly = np.asarray(area["polygon"], float)
+                lo_, hi_ = poly.min(axis=0), poly.max(axis=0)
+                along_x = (hi_[0] - lo_[0]) >= (hi_[1] - lo_[1])
+                mid = (lo_ + hi_) / 2
+                spots = [(float(a), float(mid[1]), 0.0) if along_x else (float(mid[0]), float(a), math.pi / 2)
+                         for a in pg["at"]]
+                (pv, pi_), pboxes = pergolas_mesh(spots, width=float(pg.get("width", 3.0)),
+                                                  depth=float(pg.get("depth", 2.2)), height=float(pg.get("height", 2.8)))
+                obj = _make_object(Mesh(pv, pi_), facade_texture("stair"), specular=0.10, shininess=16.0)
+                obj.collider_boxes = pboxes
+                scene.add(obj)
+                print(f"[OSM] {len(spots)} giàn hoa trên lối đi")
         if bench_placements:
             (bv, bi), bboxes = benches_mesh(bench_placements)
             obj = _make_object(Mesh(bv, bi), facade_texture("stone"), specular=0.08, shininess=16.0)
