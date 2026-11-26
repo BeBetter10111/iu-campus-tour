@@ -17,7 +17,6 @@ from scene.campus import build_campus
 from scene.collision import CollisionWorld
 from scene.light import DirectionalLight
 from scene.path import CatmullRomPath
-from scene.places import load_places, place_in_view, place_for_key, teleport_pose
 from scene.skybox import Skybox
 from scene.tour import TourController
 
@@ -32,7 +31,7 @@ class App:
     SPAWN_POS = (0.0, config.EYE_HEIGHT, 15.0)
     SPAWN_YAW = -90.0
 
-    def __init__(self):
+    def __init__(self, strict=False):
         self.window = Window()
         self.timer = Timer()
         self.running = True
@@ -44,45 +43,49 @@ class App:
         # Shader and shadow
         self.shader = Shader.from_files("phong.vert", "phong.frag")
         self.depth_shader = Shader.from_files("shadow.vert", "shadow.frag")
-        self.shadow_map = ShadowMap(config.SHADOW_MAP_SIZE)
+        self.warnings = []
+        try:
+            self.shadow_map = ShadowMap(config.SHADOW_MAP_SIZE)
+            self._shadows_supported = True
+        except Exception as e:
+            print("[Shadow] Không tạo được shadow map, tắt bóng đổ:", e)
+            self.shadow_map = None
+            self._shadows_supported = False
+            self.warnings.append("CẢNH BÁO: GPU không hỗ trợ bóng đổ, đã tắt")
         self.light = DirectionalLight()
 
-        self.scene = build_campus()
+        self.scene = build_campus(strict=strict)
+        self.warnings += getattr(self.scene, "warnings", [])
         self.SPAWN_POS = getattr(self.scene, "spawn_pos", self.SPAWN_POS)
         self.SPAWN_YAW = getattr(self.scene, "spawn_yaw", self.SPAWN_YAW)
         self.skybox = Skybox()
         self.camera = FirstPersonCamera(position=self.SPAWN_POS, yaw=self.SPAWN_YAW)
         self.collision = CollisionWorld(self.scene.objects)
+        self._jump_velocity = 0.0
 
         tour_points = getattr(self.scene, "tour_waypoints", None) or config.TOUR_WAYPOINTS
-        self.tour = TourController(CatmullRomPath(tour_points, closed=True))
+        self.tour = TourController(CatmullRomPath(tour_points, closed=True),
+                                   height_fn=getattr(self.scene, "height_at", None))
 
         self.overlay = Overlay()
         self.menu_tex = self.overlay.make_text_texture([
             "IU CAMPUS VIRTUAL TOUR",
             "",
-            "[1]  Tự do khám phá",
-            "[2]  Tham quan tự động",
-            "[ESC]  Thoát",
-        ], font_size=30, min_size=(560, 300))
+            "[1]  Free exploration",
+            "[2]  Automatic tour",
+            "[ESC]  Exit",
+        ] + ([""] + self.warnings if self.warnings else []), font_size=30, min_size=(560, 300))
         self.hud_tex = None
         self._hud_key = None
-        self.places = load_places(config.ASSET_DIR / "data" / "places.json")
-        self._label, self._label_tex = None, {}
-        hint = [
-            "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
-            "M menu   B Phong/Blinn   N bóng   F2 debug   Phím mũi tên: mặt trời",
-        ]
-        keyed = [p for p in self.places if p.get("key")]
-        if keyed:
-            hint.append("Dịch chuyển:  " + "   ".join(f"{p['key']} {p['short']}" for p in keyed))
-        self.free_hint_tex = self.overlay.make_text_texture(hint, title=False, font_size=20, pad=14)
+        self.free_hint_tex = self.overlay.make_text_texture([
+            "WASD move   Shift run   Mouse look   Space jump   TAB release mouse",
+            "M menu   B Phong/Blinn   N shadows   F2 debug   Day/night changes automatically",
+        ], title=False, font_size=20, pad=14)
 
         self.use_blinn = False
-        self.shadows_on = True
+        self.shadows_on = self._shadows_supported
         self.debug_mode = 0
         self._shadow_dirty = True
-        self._jump_velocity = 0.0
 
         self.mode = Mode.MENU
         self.mouse_captured = False
@@ -102,6 +105,7 @@ class App:
                 self._respawn()
             else:
                 self.camera.position[1] = config.EYE_HEIGHT
+                self._jump_velocity = 0.0
                 if self.collision.collides(self.camera.position):
                     self._respawn()
 
@@ -112,18 +116,8 @@ class App:
     def _respawn(self):
         self.camera.position[:] = self.SPAWN_POS
         self.camera.yaw, self.camera.pitch = self.SPAWN_YAW, 0.0
-        self.camera._update_vectors()
         self._jump_velocity = 0.0
-
-    def _teleport(self, place):
-        height_at = getattr(self.scene, "height_at", None)
-        pose = teleport_pose(place, self.collision.collides,
-                             lambda x, z: (height_at(x, z) if height_at else 0.0) + config.EYE_HEIGHT)
-        if pose:
-            self.camera.position[:] = pose[0]
-            self.camera.yaw, self.camera.pitch = pose[1], 0.0
-            self.camera._update_vectors()
-            self._jump_velocity = 0.0
+        self.camera._update_vectors()
 
     def _set_mouse_capture(self, enabled):
         self.mouse_captured = enabled
@@ -133,7 +127,7 @@ class App:
 
     def run(self):
         while self.running:
-            dt = self.timer.tick()
+            dt = self.timer.tick(config.FPS_CAP)
             self._handle_events()
             self._update(dt)
             self._render()
@@ -153,6 +147,9 @@ class App:
                 self._on_key_down(e.key)
 
     def _on_key_down(self, key):
+        if key == pygame.K_F11:
+            self.window.toggle_fullscreen()
+            return
         if self.mode == Mode.MENU:
             if key in (pygame.K_1, pygame.K_KP1):
                 self.set_mode(Mode.FREE)
@@ -179,30 +176,22 @@ class App:
                 self._set_mouse_capture(not self.mouse_captured)
             elif key == pygame.K_g:
                 self.camera.fly_mode = not self.camera.fly_mode
-                if self.camera.fly_mode:
-                    self._jump_velocity = 0.0
+                self._jump_velocity = 0.0
             elif key == pygame.K_SPACE and not self.camera.fly_mode:
                 height_at = getattr(self.scene, "height_at", None)
                 ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
                 if abs(float(self.camera.position[1]) - (ground + config.EYE_HEIGHT)) < 0.15:
                     self._jump_velocity = 6.5
-            else:
-                place = place_for_key(self.places, pygame.key.name(key).strip("[]"))
-                if place:
-                    self._teleport(place)
 
         if key == pygame.K_b:
             self.use_blinn = not self.use_blinn
             print("Specular:", "Blinn-Phong" if self.use_blinn else "Phong")
         elif key == pygame.K_n:
-            self.shadows_on = not self.shadows_on
+            self.shadows_on = (not self.shadows_on) and self._shadows_supported
             print("Shadows:", "ON" if self.shadows_on else "OFF")
         elif key == pygame.K_F2:
             self.debug_mode = (self.debug_mode + 1) % 3
             print("Debug mode:", ("normal", "shadow factor", "normals")[self.debug_mode])
-        elif key == pygame.K_p:
-            print(f"SUN_AZIMUTH = {self.light.azimuth:.0f}, "
-                  f"SUN_ELEVATION = {self.light.elevation:.0f}")
 
     def _update(self, dt):
         keys = pygame.key.get_pressed()
@@ -224,7 +213,7 @@ class App:
                     self._jump_velocity -= 18.0 * dt
                     vertical_delta = [0.0, self._jump_velocity * dt, 0.0]
                     self.camera.position = self.collision.move(self.camera.position, vertical_delta)
-                    if float(self.camera.position[1]) <= target:
+                    if self.camera.position[1] <= target:
                         self.camera.position[1] = target
                         self._jump_velocity = 0.0
                 else:
@@ -234,15 +223,8 @@ class App:
             pygame.mouse.get_rel()
             self.tour.update(self.camera, dt)
 
-        if self.mode != Mode.MENU:
-            d_az = (int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])) * 40.0 * dt
-            d_el = (int(keys[pygame.K_UP]) - int(keys[pygame.K_DOWN])) * 40.0 * dt
-            if d_az or d_el:
-                self.light.set_angles(self.light.azimuth + d_az, self.light.elevation + d_el)
-
+        self.light.advance(dt)
         self._shadow_dirty |= self.light.update(self.camera.position)
-        self._label = (place_in_view(self.places, self.camera.position, self.camera.front)
-                       if self.mode != Mode.MENU else None)
 
     def _render_shadow_pass(self):
         self.shadow_map.begin()
@@ -276,7 +258,8 @@ class App:
         s.set_float("uNormalOffset", self.light.normal_offset)
         s.set_float("uBias", config.SHADOW_BIAS)
         s.set_int("uShadowMap", 1)
-        self.shadow_map.bind(1)
+        if self.shadow_map:
+            self.shadow_map.bind(1)
 
         self.scene.draw(s)
         self.skybox.draw(view, proj, self.light.direction, self.light.color)
@@ -305,11 +288,3 @@ class App:
                     "SPACE tạm dừng   +/- tốc độ   M menu",
                 ], title=False, font_size=20, pad=14)
             self.overlay.draw_at(self.hud_tex, w, h, anchor="topleft")
-
-        if self._label is not None and self.mode != Mode.MENU:
-            key = self._label["name_vi"]
-            if key not in self._label_tex:
-                self._label_tex[key] = self.overlay.make_text_texture(
-                    [f"{key} - {self._label['name_en']}", self._label.get("info", "")],
-                    font_size=24, pad=16)
-            self.overlay.draw_at(self._label_tex[key], w, h, anchor="topcenter")

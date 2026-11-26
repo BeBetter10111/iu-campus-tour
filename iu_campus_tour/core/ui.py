@@ -1,3 +1,4 @@
+import config
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from OpenGL.GL import (
@@ -9,6 +10,19 @@ from OpenGL.GL import (
 from graphics.mesh import Mesh
 from graphics.shader import Shader
 from graphics.texture import Texture
+
+def _load_font(bold, size):
+    """Font di kem (ho tro tieng Viet) -> font he thong -> font mac dinh cua Pillow."""
+    names = ["DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"]
+    candidates = [str(config.ASSET_DIR / "fonts" / names[0]),
+                  "arialbd.ttf" if bold else "arial.ttf", names[0]]
+    for c in candidates:
+        try:
+            return ImageFont.truetype(c, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size=size)
+
 
 class Overlay:
     def __init__(self):
@@ -29,14 +43,7 @@ class Overlay:
         for index, line in enumerate(lines):
             is_title = title and index == 0 and bool(line)
             point_size = font_size + 8 if is_title else font_size
-            font_name = "arialbd.ttf" if is_title else "arial.ttf"
-            try:
-                font = ImageFont.truetype(font_name, point_size)
-            except OSError:
-                try:
-                    font = ImageFont.truetype("arial.ttf", point_size)
-                except OSError:
-                    font = ImageFont.load_default(size=point_size)
+            font = _load_font(is_title, point_size)
             fonts.append(font)
 
         boxes = [
@@ -84,8 +91,6 @@ class Overlay:
             x, y = left, bottom
         elif anchor == "topleft":
             x, y = left, 1 - height - 2 * margin / screen_height
-        elif anchor == "topcenter":
-            x, y = -width / 2, 1 - height - 2 * margin / screen_height
         else:
             raise ValueError(f"Unsupported overlay anchor: {anchor}")
 

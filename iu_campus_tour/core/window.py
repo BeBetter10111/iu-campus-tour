@@ -16,7 +16,7 @@ class Window:
         pygame.display.gl_set_attribute(
             pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_CORE
         )
-        pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)  
+        pygame.display.gl_set_attribute(pygame.GL_DEPTH_SIZE, 24)
 
         if config.MSAA_SAMPLES > 0:
             pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1)

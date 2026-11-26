@@ -24,8 +24,9 @@ def _obj(mesh, tex, position, cast_shadow=True, collidable=False, specular=0.15,
     return o
 
 
-def build_campus():
+def build_campus(strict=False):
     data_path = DATA_DIR / "campus_osm.json"
+    warning = None
     if data_path.exists():
         try:
             from scene.osm_campus import load_json, load_overrides, build_campus_from_osm
@@ -39,11 +40,19 @@ def build_campus():
                                          tour_spec=load_tour_spec(tour_path) if tour_path.exists() else None,
                                          landscape=load_json(land_path) if land_path.exists() else None)
         except Exception:
+            if strict:
+                raise
             print("[Campus] Lỗi khi nạp dữ liệu OSM -> dùng cảnh thử nghiệm:")
             traceback.print_exc()
+            warning = "CẢNH BÁO: lỗi nạp dữ liệu OSM, đang dùng cảnh thử nghiệm"
     else:
+        if strict:
+            raise FileNotFoundError(data_path)
         print(f"[Campus] Chưa có {data_path.name} (chạy tools/fetch_osm.py) -> dùng cảnh thử nghiệm")
-    return build_test_campus()
+        warning = f"CẢNH BÁO: thiếu {data_path.name}, đang dùng cảnh thử nghiệm"
+    scene = build_test_campus()
+    scene.warnings = [warning]
+    return scene
 
 
 def build_test_campus():

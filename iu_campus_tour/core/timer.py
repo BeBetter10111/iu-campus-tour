@@ -13,7 +13,11 @@ class Timer:
         self._acc = 0.0
         self._frames = 0
 
-    def tick(self):
+    def tick(self, fps_cap=0):
+        if fps_cap > 0:
+            wait = 1.0 / fps_cap - (time.perf_counter() - self._last)
+            if wait > 0:
+                time.sleep(wait)
         now = time.perf_counter()
         raw = now - self._last
         self._last = now

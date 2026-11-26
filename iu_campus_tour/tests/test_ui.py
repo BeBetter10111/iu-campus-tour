@@ -7,7 +7,11 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import core.ui as ui
+import pytest
+
+pytest.importorskip("OpenGL")
+
+import core.ui as ui  # noqa: E402
 
 
 class StubTexture:
@@ -36,14 +40,13 @@ class OverlayTests(unittest.TestCase):
         draw = Mock()
         self.overlay.draw = draw
 
-        for anchor in ("center", "bottomleft", "topleft", "topcenter"):
+        for anchor in ("center", "bottomleft", "topleft"):
             self.overlay.draw_at(texture, 1000, 500, anchor=anchor)
 
         draw.assert_has_calls([
             call(texture, (-0.2, -0.2, 0.4, 0.4)),
             call(texture, (-0.96, -0.92, 0.4, 0.4)),
             call(texture, (-0.96, 0.52, 0.4, 0.4)),
-            call(texture, (-0.2, 0.52, 0.4, 0.4)),
         ])
 
 
