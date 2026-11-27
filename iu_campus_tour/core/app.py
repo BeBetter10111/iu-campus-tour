@@ -1,5 +1,6 @@
 from enum import Enum
 
+import numpy as np
 import pygame
 from OpenGL.GL import (
     glClearColor, glClear, glEnable,
@@ -43,47 +44,43 @@ class App:
         # Shader and shadow
         self.shader = Shader.from_files("phong.vert", "phong.frag")
         self.depth_shader = Shader.from_files("shadow.vert", "shadow.frag")
-        self.warnings = []
-        try:
-            self.shadow_map = ShadowMap(config.SHADOW_MAP_SIZE)
-            self._shadows_supported = True
-        except Exception as e:
-            print("[Shadow] Không tạo được shadow map, tắt bóng đổ:", e)
-            self.shadow_map = None
-            self._shadows_supported = False
-            self.warnings.append("CẢNH BÁO: GPU không hỗ trợ bóng đổ, đã tắt")
+        self.shadow_map = ShadowMap(config.SHADOW_MAP_SIZE)
         self.light = DirectionalLight()
 
         self.scene = build_campus(strict=strict)
-        self.warnings += getattr(self.scene, "warnings", [])
         self.SPAWN_POS = getattr(self.scene, "spawn_pos", self.SPAWN_POS)
         self.SPAWN_YAW = getattr(self.scene, "spawn_yaw", self.SPAWN_YAW)
         self.skybox = Skybox()
         self.camera = FirstPersonCamera(position=self.SPAWN_POS, yaw=self.SPAWN_YAW)
         self.collision = CollisionWorld(self.scene.objects)
-        self._jump_velocity = 0.0
+        self.collision.dynamic_source = getattr(self.scene, "traffic", None)
 
         tour_points = getattr(self.scene, "tour_waypoints", None) or config.TOUR_WAYPOINTS
-        self.tour = TourController(CatmullRomPath(tour_points, closed=True),
-                                   height_fn=getattr(self.scene, "height_at", None))
+        self.tour = TourController(CatmullRomPath(tour_points, closed=True))
 
         self.overlay = Overlay()
         self.menu_tex = self.overlay.make_text_texture([
             "IU CAMPUS VIRTUAL TOUR",
             "",
-            "[1]  Free exploration",
-            "[2]  Automatic tour",
-            "[ESC]  Exit",
-        ] + ([""] + self.warnings if self.warnings else []), font_size=30, min_size=(560, 300))
+            "[1]  Tự do khám phá",
+            "[2]  Tham quan tự động",
+            "[ESC]  Thoát",
+        ], font_size=30, min_size=(560, 300))
         self.hud_tex = None
         self._hud_key = None
         self.free_hint_tex = self.overlay.make_text_texture([
-            "WASD move   Shift run   Mouse look   Space jump   TAB release mouse",
-            "M menu   B Phong/Blinn   N shadows   F2 debug   Day/night changes automatically",
+            "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
+            "M menu   B Phong/Blinn   N bóng   F2 debug",
+            "G bay/đi bộ   (khi bay: E/Space lên, Q/Ctrl xuống)",
         ], title=False, font_size=20, pad=14)
+        self.fly_tex = self.overlay.make_text_texture([
+            "CHẾ ĐỘ BAY   G để hạ cánh   E/Space lên   Q/Ctrl xuống",
+        ], title=False, font_size=20, pad=14)
+        self.notice_tex, self.notice_until = None, 0.0
+        self._frame = 0
 
         self.use_blinn = False
-        self.shadows_on = self._shadows_supported
+        self.shadows_on = True
         self.debug_mode = 0
         self._shadow_dirty = True
 
@@ -95,6 +92,8 @@ class App:
         """Update application state and input capture consistently."""
         old_mode = self.mode
         self.mode = new_mode
+        if new_mode != Mode.FREE or old_mode == Mode.MENU:
+            self.camera.fly_mode = False
 
         if new_mode == Mode.MENU:
             self._set_mouse_capture(False)
@@ -105,7 +104,6 @@ class App:
                 self._respawn()
             else:
                 self.camera.position[1] = config.EYE_HEIGHT
-                self._jump_velocity = 0.0
                 if self.collision.collides(self.camera.position):
                     self._respawn()
 
@@ -113,10 +111,41 @@ class App:
             self._set_mouse_capture(True)
             self.tour.start(self.camera)
 
+    def _ground_at(self, x, z):
+        height_at = getattr(self.scene, "height_at", None)
+        return height_at(float(x), float(z)) if height_at else 0.0
+
+    def _notify(self, text, seconds=2.5):
+        if self.notice_tex is not None:
+            self.notice_tex.delete()
+        self.notice_tex = self.overlay.make_text_texture([text], title=False, font_size=22, pad=14)
+        self.notice_until = self.timer.total + seconds
+
+    def _toggle_fly(self):
+        cam = self.camera
+        if not cam.fly_mode:
+            cam.fly_mode = True
+            return
+        # Landing: only if the whole column down to the ground is free (not on a roof / inside a wall).
+        x, z = float(cam.position[0]), float(cam.position[2])
+        target = self._ground_at(x, z) + config.EYE_HEIGHT
+        y = float(cam.position[1])
+        ok = True
+        while True:
+            if self.collision.collides(np.array([x, y, z], dtype=np.float32)):
+                ok = False
+                break
+            if y <= target + 1e-3:
+                break
+            y = max(target, y - 0.25)
+        if ok:
+            cam.fly_mode = False
+        else:
+            self._notify("Không thể hạ cánh ở đây (có vật cản) - bay sang chỗ khác")
+
     def _respawn(self):
         self.camera.position[:] = self.SPAWN_POS
         self.camera.yaw, self.camera.pitch = self.SPAWN_YAW, 0.0
-        self._jump_velocity = 0.0
         self.camera._update_vectors()
 
     def _set_mouse_capture(self, enabled):
@@ -127,7 +156,7 @@ class App:
 
     def run(self):
         while self.running:
-            dt = self.timer.tick(config.FPS_CAP)
+            dt = self.timer.tick()
             self._handle_events()
             self._update(dt)
             self._render()
@@ -147,9 +176,6 @@ class App:
                 self._on_key_down(e.key)
 
     def _on_key_down(self, key):
-        if key == pygame.K_F11:
-            self.window.toggle_fullscreen()
-            return
         if self.mode == Mode.MENU:
             if key in (pygame.K_1, pygame.K_KP1):
                 self.set_mode(Mode.FREE)
@@ -175,19 +201,13 @@ class App:
             if key == pygame.K_TAB:
                 self._set_mouse_capture(not self.mouse_captured)
             elif key == pygame.K_g:
-                self.camera.fly_mode = not self.camera.fly_mode
-                self._jump_velocity = 0.0
-            elif key == pygame.K_SPACE and not self.camera.fly_mode:
-                height_at = getattr(self.scene, "height_at", None)
-                ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
-                if abs(float(self.camera.position[1]) - (ground + config.EYE_HEIGHT)) < 0.15:
-                    self._jump_velocity = 6.5
+                self._toggle_fly()
 
         if key == pygame.K_b:
             self.use_blinn = not self.use_blinn
             print("Specular:", "Blinn-Phong" if self.use_blinn else "Phong")
         elif key == pygame.K_n:
-            self.shadows_on = (not self.shadows_on) and self._shadows_supported
+            self.shadows_on = not self.shadows_on
             print("Shadows:", "ON" if self.shadows_on else "OFF")
         elif key == pygame.K_F2:
             self.debug_mode = (self.debug_mode + 1) % 3
@@ -195,6 +215,7 @@ class App:
 
     def _update(self, dt):
         keys = pygame.key.get_pressed()
+        self.light.advance(dt)
 
         if self.mode == Mode.FREE:
             if self.mouse_captured:
@@ -203,27 +224,27 @@ class App:
             delta = self.camera.get_move_delta(keys, dt)
             self.camera.position = self.collision.move(self.camera.position, delta)
             if self.camera.fly_mode:
-                self.camera.position[1] = max(self.camera.position[1], 0.3)
+                ground = self._ground_at(self.camera.position[0], self.camera.position[2])
+                self.camera.position[1] = min(max(self.camera.position[1], ground + config.FLY_MIN_CLEARANCE),
+                                              config.FLY_MAX_HEIGHT)
             else:
                 # Keep the camera at eye height above the current walking surface.
                 height_at = getattr(self.scene, "height_at", None)
                 ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
                 target = ground + config.EYE_HEIGHT
-                if self._jump_velocity != 0.0:
-                    self._jump_velocity -= 18.0 * dt
-                    vertical_delta = [0.0, self._jump_velocity * dt, 0.0]
-                    self.camera.position = self.collision.move(self.camera.position, vertical_delta)
-                    if self.camera.position[1] <= target:
-                        self.camera.position[1] = target
-                        self._jump_velocity = 0.0
-                else:
-                    self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
+                self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
 
         elif self.mode == Mode.TOUR:
             pygame.mouse.get_rel()
             self.tour.update(self.camera, dt)
 
-        self.light.advance(dt)
+        if self.mode != Mode.MENU and getattr(self.scene, "traffic", None) is not None:
+            self.scene.update_dynamic(dt, (float(self.camera.position[0]), float(self.camera.position[2]))
+                                      if self.mode == Mode.FREE else None)
+            self._frame += 1
+            if self._frame % 2 == 0:          # moving shadows: refresh the shadow map at half rate
+                self._shadow_dirty = True
+
         self._shadow_dirty |= self.light.update(self.camera.position)
 
     def _render_shadow_pass(self):
@@ -258,8 +279,7 @@ class App:
         s.set_float("uNormalOffset", self.light.normal_offset)
         s.set_float("uBias", config.SHADOW_BIAS)
         s.set_int("uShadowMap", 1)
-        if self.shadow_map:
-            self.shadow_map.bind(1)
+        self.shadow_map.bind(1)
 
         self.scene.draw(s)
         self.skybox.draw(view, proj, self.light.direction, self.light.color)
@@ -274,6 +294,10 @@ class App:
 
         elif self.mode == Mode.FREE:
             self.overlay.draw_at(self.free_hint_tex, w, h, anchor="bottomleft")
+            if self.camera.fly_mode:
+                self.overlay.draw_at(self.fly_tex, w, h, anchor="topleft")
+            if self.notice_tex is not None and self.timer.total < self.notice_until:
+                self.overlay.draw_at(self.notice_tex, w, h, anchor="center")
 
         elif self.mode == Mode.TOUR:
             key = (int(self.tour.progress() * 100), self.tour.paused, round(self.tour.speed, 1))

@@ -9,11 +9,11 @@ MSAA_SAMPLES = 4
 GL_MAJOR = 3
 GL_MINOR = 3            
 
-GL_ERROR_CHECKING = False   # True chi khi debug (cham 2-3 lan)
+GL_ERROR_CHECKING = True
 
 # Render
-CLEAR_COLOR = (0.53, 0.81, 0.92, 1.0)   #
-FPS_CAP = 0            # 0 = khong gioi han (vsync quyet dinh)
+CLEAR_COLOR = (0.53, 0.81, 0.92, 1.0)   
+FPS_CAP = 0            
 FPS_TITLE_INTERVAL = 0.5  
 
 # Camera
@@ -24,6 +24,9 @@ EYE_HEIGHT = 1.7
 WALK_SPEED = 4.0      # m/s
 RUN_SPEED = 8.0       # m/s 
 MOUSE_SENSITIVITY = 0.1  
+FLY_SPEED_MULT = 2.0    # fly mode (G) speed multiplier
+FLY_MAX_HEIGHT = 250.0
+FLY_MIN_CLEARANCE = 0.6  # metres above the ground while flying
 
 # Assets 
 from pathlib import Path
@@ -39,7 +42,7 @@ SUN_COLOR = (1.0, 0.95, 0.85)
 SUN_INTENSITY = 1.0
 AMBIENT_COLOR = (0.25, 0.28, 0.35)   
 DAY_LENGTH_SECONDS = 240.0
-NIGHT_SPEED_FACTOR = 3.0
+NIGHT_SPEED_FACTOR = 2.0
 
 # Shadow mapping
 SHADOW_MAP_SIZE = 2048

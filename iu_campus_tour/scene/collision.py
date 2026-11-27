@@ -21,6 +21,7 @@ class CollisionWorld:
                 maxs.extend(b[:, 3:])
                 owners.extend([None] * len(b))                    
         self.owners = owners
+        self.dynamic_source = None     # object with .circles() -> (n,4) x,z,r,top (cars, pedestrians)
         self.collidable_objects = [o for o in owners if o is not None]
         if mins:
             self.aabb_mins = np.array(mins, dtype=np.float32)
@@ -55,6 +56,26 @@ class CollisionWorld:
                 return True
         return False
 
+    def _hits_dynamic(self, pos, cur=None):
+        """True if ``pos`` overlaps a moving agent (unless the move leads away from one already overlapped)."""
+        src = self.dynamic_source
+        if src is None:
+            return False
+        c = src.circles()
+        if len(c) == 0:
+            return False
+        if pos[1] - config.EYE_HEIGHT >= 0.05 + float(c[:, 3].max()):      # flying above everything
+            return False
+        feet = pos[1] - config.EYE_HEIGHT
+        d = np.hypot(c[:, 0] - pos[0], c[:, 1] - pos[2])
+        hit = (d < c[:, 2] + config.PLAYER_RADIUS) & (feet < c[:, 3])
+        if not hit.any():
+            return False
+        if cur is None:
+            return True
+        d0 = np.hypot(c[:, 0] - cur[0], c[:, 1] - cur[2])
+        return bool(np.any(hit & (d <= d0 + 1e-4)))
+
     def move(self, pos, delta):
         pos = np.asarray(pos, dtype=np.float32)
         delta = np.asarray(delta, dtype=np.float32)
@@ -71,6 +92,6 @@ class CollisionWorld:
                     continue
                 trial = cur.copy()
                 trial[axis] += step[axis]
-                if not self.collides(trial):
+                if not self.collides(trial) and not self._hits_dynamic(trial, cur):
                     cur = trial
         return cur

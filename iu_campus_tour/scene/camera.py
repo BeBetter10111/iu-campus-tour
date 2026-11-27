@@ -69,10 +69,11 @@ class FirstPersonCamera:
         if keys[pygame.K_a]:
             move -= self.right
         if self.fly_mode:
-            if keys[pygame.K_e]:
+            if keys[pygame.K_e] or keys[pygame.K_SPACE]:
                 move[1] += 1.0
-            if keys[pygame.K_q]:
+            if keys[pygame.K_q] or keys[pygame.K_LCTRL]:
                 move[1] -= 1.0
+            speed *= getattr(config, 'FLY_SPEED_MULT', 2.0)
         length = np.linalg.norm(move)
         return move / length * speed * dt if length > 0 else move
 
