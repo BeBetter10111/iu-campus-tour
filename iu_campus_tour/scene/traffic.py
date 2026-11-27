@@ -4,12 +4,26 @@ from collections import defaultdict
 import numpy as np
 
 from graphics.mesh import _BOX_FACES
-from scene.geometry2d import point_in_edges, dist_to_edges
+from scene.geometry2d import point_in_edges, dist_to_edges, circle_hits_rings
 from scene.tour_route import build_graph
 
 CAR_KINDS = {"service", "residential", "tertiary", "tertiary_link", "unclassified"}
 PED_KINDS = {"footway", "path", "pedestrian", "cycleway", "track", "service"}
 LANE_WIDTH = {"tertiary": 8.5, "tertiary_link": 5.5, "residential": 6.5, "unclassified": 5.5, "service": 5.5}
+
+ROAD_WIDTH = {"tertiary": 8.5, "tertiary_link": 5.5, "residential": 6.5, "unclassified": 5.5, "service": 5.5,
+              "track": 3.5, "cycleway": 3.0, "pedestrian": 4.5, "footway": 2.8, "path": 2.2}
+
+# pedestrian hazard avoidance
+PED_SEE_RANGE = 22.0              # m: how far a pedestrian notices a car
+PED_FOV = math.radians(110.0)     # half-angle of the field of view (a car behind is not "seen")
+PED_HEAR_RANGE = 6.0              # m: a car this close is noticed even outside the field of view
+CAR_HALF_WIDTH = 0.9
+CAR_CORRIDOR = CAR_HALF_WIDTH + 0.3 + 0.6   # lateral half-width of a car's path that a person must leave
+ROADSIDE_MARGIN = 0.6             # m beyond the paved edge where a dodging person stands
+DODGE_SPEED = 2.2                 # m/s sideways while stepping out of the way
+TREE_CLEARANCE = {"tree": 1.2, "small": 1.0, "palm": 1.0, "shrub": 1.1}
+WALL_CLEARANCE = 0.5
 
 DEFAULTS = {"enabled": True, "cars":45, "pedestrians": 100, "parked_cars": 24,
             "car_speed": 5.5, "ped_speed": 1.3, "seed": 2024}
@@ -135,6 +149,13 @@ class Agent:
         self.phase = rng.uniform(0, 6.28)
         self.wait = 0.0
         self.ghost = 0.0
+        self.widths = None            # {(a, b): paved width} of the graph edges (pedestrians)
+        self.half_width = 1.4
+        self.dodge = 0.0              # extra lateral offset (m, + = right) while avoiding a car
+        self.dodge_target = 0.0
+        self.alert = 0.0              # > 0 while a pedestrian is waiting at the roadside for a car
+        self._replan = 0.0
+        self.crossing = False         # a car is coming while this person crosses its road
         self._edge_len = 1.0
         self._set_edge(node, nxt)
         self.x, self.z = self._target()
@@ -147,13 +168,21 @@ class Agent:
         self._edge_len = max(math.hypot(dx, dz), 1e-6)
         self._dir = (dx / self._edge_len, dz / self._edge_len)
         self._heading = math.atan2(dz, dx)
+        if self.widths is not None:
+            self.half_width = 0.5 * self.widths.get((a, b), 2.8)
 
     def _target(self):
         dx, dz = self._dir
         rx, rz = -dz, dx          # right-hand side of travel (y up); positive lane = keep right
-        px = self.node[0] + dx * self.s + rx * self.lane
-        pz = self.node[1] + dz * self.s + rz * self.lane
+        off = self.lane + self.dodge
+        px = self.node[0] + dx * self.s + rx * off
+        pz = self.node[1] + dz * self.s + rz * off
         return px, pz
+
+    def _lateral_point(self, off):
+        """World point at lateral offset ``off`` (from the edge centre line) at the current ``s``."""
+        dx, dz = self._dir
+        return (self.node[0] + dx * self.s - dz * off, self.node[1] + dz * self.s + dx * off)
 
     def circles(self):
         """Collision circles (x, z, r): one for a person, two for a car."""
@@ -177,9 +206,122 @@ class Agent:
         w = np.array(w) / sum(w)
         return options[int(self.rng.choice(len(options), p=w))]
 
-    def update(self, dt, others, player, blockers):
-        """Advance one step. ``others`` = list of Agents, ``player`` = (x, z) or None."""
+    # pedestrian: notice cars and step onto the roadside
+    def _car_threats(self, cars):
+        """(seen, near): ``seen`` = (distance, lateral) of visible cars whose path covers this person,
+        ``near`` = lateral offsets (in this edge's frame) of every car close enough to matter."""
+        dx, dz = self._dir
+        rx, rz = -dz, dx
+        bx, bz = self.node[0] + dx * self.s, self.node[1] + dz * self.s
+        hx, hz = math.cos(self.yaw), math.sin(self.yaw)
+        seen, near, crossing = [], [], False
+        for c in cars:
+            vx, vz = c.x - self.x, c.z - self.z
+            d = math.hypot(vx, vz)
+            if d > PED_SEE_RANGE:
+                continue
+            lat_here = (c.x - bx) * rx + (c.z - bz) * rz
+            # only cars running along this way (roughly parallel) occupy a lateral band of it
+            parallel = abs(math.cos(c.yaw) * dx + math.sin(c.yaw) * dz) > 0.5
+            if parallel and d < 16.0:
+                near.append(lat_here)
+            cc, cs = math.cos(c.yaw), math.sin(c.yaw)
+            fwd = -vx * cc - vz * cs                  # this person in the car's frame
+            lat = vx * cs - vz * cc
+            if not -c.length / 2 < fwd < 25.0:
+                continue                              # car already past / too far down the road
+            on_this_road = parallel and abs(lat_here) < self.half_width + 0.5
+            if not on_this_road and abs(lat) >= CAR_CORRIDOR:
+                continue                              # the car will not pass here
+            visible = d < PED_HEAR_RANGE or (d > 1e-6 and (vx * hx + vz * hz) / d >= math.cos(PED_FOV))
+            if not visible:
+                continue
+            if on_this_road:
+                seen.append((d, lat_here))
+            else:
+                crossing = True                       # crossing the car's road: finish crossing quickly
+        self.crossing = crossing
+        return seen, near
+
+    def _spot_clear(self, x, z, blockers, trees):
+        if trees is not None and len(trees):
+            if np.any((trees[:, 0] - x) ** 2 + (trees[:, 1] - z) ** 2 < trees[:, 2] ** 2):
+                return False
+        return not any(circle_hits_rings(x, z, WALL_CLEARANCE, e) for e in blockers)
+
+    def _path_clear(self, p_from, p_to, blockers, trees):
+        """Sideways step from offset ``p_from`` to ``p_to`` touches no tree and no building."""
+        n = max(2, int(abs(p_to - p_from) / 0.3) + 1)
+        for t in np.linspace(0.0, 1.0, n)[1:]:
+            x, z = self._lateral_point(p_from + (p_to - p_from) * t)
+            if not self._spot_clear(x, z, blockers, trees):
+                return False
+        return True
+
+    def _plan_dodge(self, seen, near, blockers, trees):
+        """Pick a roadside offset: move away from the car, never across a car's path,
+        never into a car corridor, never toward a tree/building. None = stay put."""
+        p = self.lane + self.dodge
+        edge = self.half_width + ROADSIDE_MARGIN
+        primary = min(seen)[1]
+        if abs(p - primary) < 0.05:                   # dead centre: prefer the side already chosen / right
+            first = 1 if self.dodge_target >= 0 else -1
+        else:
+            first = 1 if p > primary else -1
+        lanes = list(near) + [c for _, c in seen]
+        for side in (first, -first):
+            off = side * edge
+            while side * off > 0:
+                in_lane = any(abs(off - c) < CAR_CORRIDOR for c in lanes)
+                crosses = any(min(p, off) < c < max(p, off) and abs(c - p) > 0.05 for c in lanes)
+                if crosses:
+                    break                             # this side means walking in front of a car
+                if not in_lane and self._path_clear(p, off, blockers, trees):
+                    return off
+                off -= side * 0.4                     # a little closer to the road, still outside its lanes
+        return None
+
+    def _avoid_cars(self, dt, cars, blockers, trees):
+        seen, near = self._car_threats(cars)
+        if seen:
+            self.alert = 1.0                          # keep waiting ~1 s after the car has gone
+            self._replan -= dt
+            if self._replan <= 0.0:
+                self._replan = 0.3
+                off = self._plan_dodge(seen, near, blockers, trees)
+                # no safe roadside spot -> stand still where we are (the car stops for us)
+                self.dodge_target = (off - self.lane) if off is not None else self.dodge
+        else:
+            self.alert = max(0.0, self.alert - dt)
+            self._replan = 0.0
+            if self.alert <= 0.0 and self.dodge != 0.0:
+                p, back = self.lane + self.dodge, self.lane
+                # step back onto the path only when no car is around that lane and the way is clear
+                if not any(abs(back - c) < CAR_CORRIDOR or min(p, back) < c < max(p, back) for c in near) \
+                        and self._path_clear(p, back, blockers, trees):
+                    self.dodge_target = 0.0
+                else:
+                    self.dodge_target = self.dodge
+        step = DODGE_SPEED * dt
+        diff = self.dodge_target - self.dodge
+        self.dodge += max(-step, min(step, diff))
+
+    def update(self, dt, others, player, blockers, trees=None, cars=None):
+        """Advance one step. ``others`` = list of Agents, ``player`` = (x, z) or None,
+        ``trees`` = array (n, 3) x, z, keep-out radius; ``cars`` = moving car agents."""
+        if self.kind == "ped":
+            if cars is None:
+                cars = [o for o in others if o.kind == "car"]
+            self._avoid_cars(dt, cars, blockers, trees)
+            if self.alert > 0.0 or self.dodge != 0.0:
+                # waiting at the roadside: do not walk on (the path ahead may hold trees)
+                self.speed = 0.0
+                self.wait = 0.0
+                self._settle(dt)
+                return
         blocked = self._blocked(others, player)
+        if self.kind == "ped" and self.crossing:
+            blocked = False                           # never freeze in the middle of a carriageway
         if blocked and self.ghost <= 0.0:
             self.wait += dt
             if self.wait > 5.0:                  # deadlock breaker: ignore others for a moment
@@ -188,6 +330,8 @@ class Agent:
             self.wait = 0.0
         self.ghost = max(0.0, self.ghost - dt)
         want = 0.0 if (blocked and self.ghost <= 0.0) else self.base_speed
+        if self.kind == "ped" and self.crossing and want > 0.0:
+            want = self.base_speed * 1.8              # hurry across, never step sideways along the lane
         self.speed += (want - self.speed) * min(1.0, (6.0 if want == 0.0 else 2.5) * dt)
         self.s += self.speed * dt
         while self.s >= self._edge_len:
@@ -199,6 +343,11 @@ class Agent:
             a, b = self.nxt, self.node
             self.s = max(0.0, self._edge_len - self.s)
             self._set_edge(a, b)
+            tx, tz = self._target()
+        self._settle(dt, tx, tz)
+
+    def _settle(self, dt, tx=None, tz=None):
+        if tx is None:
             tx, tz = self._target()
         k = min(1.0, 8.0 * dt)
         self.x += (tx - self.x) * k
@@ -231,14 +380,16 @@ class Agent:
 
 
 class TrafficSystem:
-    def __init__(self, agents, blockers):
+    def __init__(self, agents, blockers, trees=None):
         self.agents = agents
         self.blockers = blockers
+        self.trees = np.asarray(trees if trees is not None else [], np.float32).reshape(-1, 3)
+        self.cars = [a for a in agents if a.kind == "car"]
 
     def update(self, dt, player_xz=None):
         dt = min(dt, 0.1)
         for a in self.agents:
-            a.update(dt, self.agents, player_xz, self.blockers)
+            a.update(dt, self.agents, player_xz, self.blockers, self.trees, self.cars)
 
     def circles(self):
         """Array (n, 4): x, z, radius, top_height for every collision circle."""
@@ -266,8 +417,29 @@ def _spawn(kind, graph, n, rng, min_gap, avoid, speed, lane_fn, radius, length, 
     return agents
 
 
-def build_traffic(roads, blockers, cfg=None, avoid=(), seed=2024, bounds=None):
-    """Create the car and pedestrian agents (no GL needed)."""
+def tree_keepouts(plants):
+    """(x, z, kind, ...) plant tuples -> array (n, 3): x, z, radius a pedestrian must stay outside."""
+    rows = [(p[0], p[1], TREE_CLEARANCE.get(p[2] if len(p) > 2 else "tree", 1.2)) for p in (plants or [])]
+    return np.array(rows, np.float32).reshape(-1, 3)
+
+
+def edge_widths(roads, kinds, widths=None):
+    """{(a, b): paved width} for every graph edge of the given road kinds."""
+    w_of = {**ROAD_WIDTH, **{k: float(v) for k, v in (widths or {}).items()}}
+    out = {}
+    for r in roads:
+        k = r.get("kind")
+        if k not in kinds:
+            continue
+        for p, q in zip(r["points"], r["points"][1:]):
+            k1, k2 = (round(p[0], 2), round(p[1], 2)), (round(q[0], 2), round(q[1], 2))
+            out[(k1, k2)] = out[(k2, k1)] = max(out.get((k1, k2), 0.0), w_of.get(k, 2.8))
+    return out
+
+
+def build_traffic(roads, blockers, cfg=None, avoid=(), seed=2024, bounds=None, trees=None, road_widths=None):
+    """Create the car and pedestrian agents (no GL needed).
+    ``trees`` = (x, z, keep-out radius) rows; ``road_widths`` = per-kind width overrides."""
     cfg = {**DEFAULTS, **(cfg or {})}
     rng = np.random.default_rng(cfg.get("seed", seed))
     car_graph = usable_graph(roads, CAR_KINDS, blockers, bounds)
@@ -286,7 +458,11 @@ def build_traffic(roads, blockers, cfg=None, avoid=(), seed=2024, bounds=None):
                   1.0, 4.2, 1.5, 8)
     peds = _spawn("ped", ped_graph, int(cfg["pedestrians"]), rng, 2.5, avoid, cfg["ped_speed"],
                   lambda a, b: 0.5, 0.3, 0.0, 1.8, 6)
-    return TrafficSystem(cars + peds, blockers)
+    widths = edge_widths(roads, PED_KINDS, road_widths)
+    for p in peds:
+        p.widths = widths
+        p.half_width = 0.5 * widths.get((p.node, p.nxt), 2.8)
+    return TrafficSystem(cars + peds, blockers, trees)
 
 
 # parked cars
@@ -368,7 +544,9 @@ def populate_traffic(scene, data, landscape, obstacle_edges, spawn_xz=None):
     bounds = (pts[:, 0].min() - margin, pts[:, 1].min() - margin, pts[:, 0].max() + margin, pts[:, 1].max() + margin) \
         if len(pts) else None
     traffic = build_traffic(data.get("roads", []), obstacle_edges, cfg,
-                            avoid=[spawn_xz] if spawn_xz else (), seed=cfg["seed"], bounds=bounds)
+                            avoid=[spawn_xz] if spawn_xz else (), seed=cfg["seed"], bounds=bounds,
+                            trees=tree_keepouts(getattr(scene, "plants", None)),
+                            road_widths=landscape.get("road_widths"))
     for a in traffic.agents:
         mesh = car_mesh(a.variant) if a.kind == "car" else ped_mesh(a.variant)
         a.obj = DynamicObject(mesh, palette, specular=0.3 if a.kind == "car" else 0.05)
