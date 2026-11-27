@@ -14,22 +14,28 @@ from graphics.stairs import Stair, stairs_mesh
 from graphics.furniture import place_benches, benches_mesh
 from scene.geometry2d import rings_to_edges, circle_hits_rings, point_in_edges
 from scene.scene import Scene, SceneObject
+from scene.road_cleanup import apply_road_edits, clip_roads_to_buildings, split_at_junctions
 DATA_DIR = getattr(config, "DATA_DIR", config.ASSET_DIR / "data")
+# Ground layers, bottom -> top (y in metres). Layers are a few mm apart so they never z-fight:
+#   walkways (under roads, so a footway crossing a street is simply covered by the asphalt)
+#   < parking < marked streets < junction patches (plain asphalt) < plain service roads < paved plazas.
 ROAD_STYLE = {
-    "tertiary":      ("asphalt_marked", 8.5, 0.030, MARKED_TILE, True),
-    "tertiary_link": ("asphalt_marked", 5.5, 0.032, MARKED_TILE, True),
-    "residential":   ("asphalt",        6.5, 0.034, ASPHALT_TILE, False),
-    "unclassified":  ("asphalt",        5.5, 0.036, ASPHALT_TILE, False),
-    "service":       ("asphalt",        5.5, 0.040, ASPHALT_TILE, False),
-    "track":         ("concrete",       3.5, 0.045, CONCRETE_TILE, False),
-    "cycleway":      ("asphalt",        3.0, 0.050, ASPHALT_TILE, False),
-    "pedestrian":    ("paving",         4.5, 0.055, PAVING_TILE, False),
-    "footway":       ("paving",         2.8, 0.060, PAVING_TILE, False),
-    "path":          ("paving",         2.2, 0.062, PAVING_TILE, False),
+    "tertiary":      ("asphalt_marked", 8.5, 0.034, MARKED_TILE, True),
+    "tertiary_link": ("asphalt_marked", 5.5, 0.036, MARKED_TILE, True),
+    "residential":   ("asphalt",        6.5, 0.050, ASPHALT_TILE, False),
+    "unclassified":  ("asphalt",        5.5, 0.052, ASPHALT_TILE, False),
+    "service":       ("asphalt",        5.5, 0.054, ASPHALT_TILE, False),
+    "track":         ("concrete",       3.5, 0.016, CONCRETE_TILE, False),
+    "cycleway":      ("asphalt",        3.0, 0.014, ASPHALT_TILE, False),
+    "pedestrian":    ("paving",         4.5, 0.012, PAVING_TILE, False),
+    "footway":       ("paving",         2.8, 0.010, PAVING_TILE, False),
+    "path":          ("paving",         2.2, 0.008, PAVING_TILE, False),
 }
+VEHICLE_KINDS = {"tertiary", "tertiary_link", "residential", "unclassified", "service"}
+JUNCTION_Y = 0.044
 GATE_KINDS = {"tertiary", "tertiary_link", "residential", "unclassified", "service"}
-PARKING_Y = 0.040
-PAVED_Y = 0.064
+PARKING_Y = 0.026
+PAVED_Y = 0.070
 ROAD_MARGIN = 300.0
 RAISED_MIN = 2.5
 ROOF_ONLY_KINDS = {"roof", "carport", "canopy"}
@@ -146,14 +152,28 @@ def add_ground_layers(scene, data, bounds, styles=None, extra_concrete=(), extra
     x0, z0, x1, z1 = bounds
     inside = lambda pts: any(x0 <= p[0] <= x1 and z0 <= p[1] <= z1 for p in pts)
     groups, count = {}, 0
-    for k, r in enumerate(data.get("roads", [])):
-        style = styles.get(r.get("kind"))
-        if style is None or not inside(r["points"]):
-            continue
-        tex_kind, width, y, tile, full = style
+    roads = [r for r in data.get("roads", []) if r.get("kind") in styles and inside(r["points"])]
+    marked = {k for k, st in styles.items() if st[4]}
+    pieces = split_at_junctions(roads, {k: st[1] for k, st in styles.items()}, marked, VEHICLE_KINDS)
+    for k, r in enumerate(roads):
+        tex_kind, width, y, tile, full = styles[r["kind"]]
         pts = r["points"]
         closed = len(pts) > 3 and pts[0] == pts[-1]
-        part = polyline_strip(pts, width, y + 0.0015 * (k % 6), tile, full_width=full, closed=closed)
+        dy = 0.001 * (k % 3)
+        if k in pieces:
+            # marked street: markings stop before junctions, the junction itself is plain asphalt
+            for sub, plain in pieces[k]:
+                if plain:
+                    part = polyline_strip(sub, width, JUNCTION_Y + dy, ASPHALT_TILE)
+                    key = "asphalt"
+                else:
+                    part = polyline_strip(sub, width, y + dy, tile, full_width=full)
+                    key = tex_kind
+                if part is not None:
+                    groups.setdefault(key, []).append(part)
+            count += 1
+            continue
+        part = polyline_strip(pts, width, y + dy, tile, full_width=full, closed=closed)
         if part is not None:
             groups.setdefault(tex_kind, []).append(part)
             count += 1
@@ -211,6 +231,21 @@ def _manual_building(i, b):
     """Convert manually defined buildings to the OSM building format."""
     return {"id": b.get("id", f"manual/{i}"), "name": b.get("name", ""), "name_en": "", "kind": b.get("kind", "yes"),
             "levels": None, "height": None, "holes": b.get("holes", []), "outer": b["outer"]}
+def _clean_roads(data, active, overrides, landscape):
+    """Apply manual road edits, then cut roads under ground-level buildings and drop dead-end stubs."""
+    roads, rep = apply_road_edits(data.get("roads", []), landscape.get("road_edits"))
+    if any(rep.values()):
+        print(f"[OSM] sửa đường theo landscape.json: bỏ {rep['removed']}, thay {rep['replaced']}, thêm {rep['added']}")
+    if landscape.get("clip_roads_to_buildings", True):
+        rings = []
+        for b in active:
+            st = resolve_style(b, overrides)
+            if not st["roof_only"] and st["base"] < RAISED_MIN:
+                rings.append(b["outer"])
+        roads, crep = clip_roads_to_buildings(roads, rings)
+        if crep["cut"]:
+            print(f"[OSM] đường chạy dưới tòa nhà: cắt {crep['cut']} đường, bỏ {crep['dropped']} đoạn cụt")
+    return {**data, "roads": roads}
 def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=None, landscape=None):
     overrides = overrides or {"by_name": {}, "by_id": {}, "connect_doors": {}, "extra_buildings": []}
     landscape = landscape or {}
@@ -218,6 +253,7 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
     scene = Scene()
     all_buildings = list(data["buildings"]) + [_manual_building(i, b) for i, b in enumerate(overrides.get("extra_buildings", []))]
     active = [b for b in all_buildings if not resolve_style(b, overrides)["skip"]]
+    data = _clean_roads(data, active, overrides, landscape)
     extent = max([abs(c) for b in active for p in b["outer"] for c in p] + [100.0])
     G = 2.0 * (extent + 250.0)
     scene.add(_make_object(create_box((G, 0.2, G), tex_size=GRASS_TILE),

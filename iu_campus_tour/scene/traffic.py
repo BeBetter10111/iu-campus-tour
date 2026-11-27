@@ -11,7 +11,7 @@ CAR_KINDS = {"service", "residential", "tertiary", "tertiary_link", "unclassifie
 PED_KINDS = {"footway", "path", "pedestrian", "cycleway", "track", "service"}
 LANE_WIDTH = {"tertiary": 8.5, "tertiary_link": 5.5, "residential": 6.5, "unclassified": 5.5, "service": 5.5}
 
-DEFAULTS = {"enabled": True, "cars": 14, "pedestrians": 36, "parked_cars": 24,
+DEFAULTS = {"enabled": True, "cars":45, "pedestrians": 100, "parked_cars": 24,
             "car_speed": 5.5, "ped_speed": 1.3, "seed": 2024}
 
 # palette

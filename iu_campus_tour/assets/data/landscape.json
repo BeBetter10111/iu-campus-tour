@@ -8,6 +8,17 @@
     "residential": 6.5,
     "tertiary": 8.5
   },
+  "clip_roads_to_buildings": true,
+  "road_edits": {
+    "note": "Duong truoc can-tin (way/717846222) noi thang len duong phia Bac (way/290397646) thanh vong quanh cum A; bo loi di chu L (way/724934207) vi trung voi duong moi. Doan cut cua way/1565444088 sau khi bi can-tin cat duoc tu dong bo (clip_roads_to_buildings).",
+    "remove": ["way/724934207"],
+    "replace": {
+      "way/717846222": {
+        "points": [[-143.95, 67.08], [-141.8, 37.04], [-141.71, -1.6], [-141.7, -34.0], [-140.6, -39.0],
+                   [-137.5, -41.9], [-133.0, -42.7], [-125.0, -42.8], [-115.61, -43.49]]
+      }
+    }
+  },
   "parking": [
     {
       "name": "Bai xe Tay-Bac",
@@ -33,7 +44,7 @@
       "gates": [
         {
           "at": [
-            -147.0,
+            -133.0,
             -45.5
           ],
           "width": 4.5
