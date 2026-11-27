@@ -8,7 +8,8 @@ from graphics.procedural_textures import (facade_texture, ground_texture as make
                                           GRASS_TILE, ASPHALT_TILE, MARKED_TILE, PAVING_TILE, CONCRETE_TILE)
 from graphics.roads import polyline_strip, polygon_flat, merge_meshes
 from graphics.vegetation import build_plants
-from graphics.fence import fence_for_polygon, oriented_box
+from graphics.fence import (fence_for_polygon, oriented_box, perimeter_fence,
+                            gates_from_roads)
 from graphics.stairs import Stair, stairs_mesh
 from graphics.furniture import place_benches, benches_mesh
 from scene.geometry2d import rings_to_edges, circle_hits_rings, point_in_edges
@@ -346,6 +347,21 @@ def build_campus_from_osm(data, overrides=None, ground_texture=None, tour_spec=N
                 obj = _make_object(Mesh(cv, ci), facade_texture("stone"), specular=0.05)
                 obj.collider_boxes = np.array(boxes_c, np.float32)
                 scene.add(obj)
+    boundary = landscape.get("campus_boundary", {})
+    if boundary.get("fence") and boundary.get("polygon"):
+        gates = list(boundary.get("gates", []))
+        if boundary.get("auto_gates"):
+            gates.extend(gates_from_roads(boundary["polygon"], data.get("roads", []), styles,
+                                          kinds=GATE_KINDS))
+        (solid, bars), boxes, rep = perimeter_fence(
+            boundary["polygon"], gates, height=float(boundary.get("height", 2.0)))
+        obj = _make_object(Mesh(*solid), facade_texture("stone"), cast_shadow=False, specular=0.2)
+        obj.collider_boxes = boxes
+        scene.add(obj)
+        scene.add(_make_object(Mesh(*bars), facade_texture("fence"), cast_shadow=False, specular=0.2))
+        for gate in rep:
+            if not gate["ok"]:
+                report.append(f"  cổng rào khuôn viên tại {gate['at']} cách rào quá xa, bỏ qua")
     all_pts = np.array([p for b in active for p in b["outer"]], dtype=np.float64)
     extra_paving, paved_edges = [], [rings_to_edges([s.footprint()]) for s in stairs]
     if len(all_pts):

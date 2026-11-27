@@ -54,6 +54,7 @@ class App:
         self.camera = FirstPersonCamera(position=self.SPAWN_POS, yaw=self.SPAWN_YAW)
         self.collision = CollisionWorld(self.scene.objects)
         self.collision.dynamic_source = getattr(self.scene, "traffic", None)
+        self.jump_velocity = 0.0
 
         tour_points = getattr(self.scene, "tour_waypoints", None) or config.TOUR_WAYPOINTS
         self.tour = TourController(CatmullRomPath(tour_points, closed=True))
@@ -71,7 +72,7 @@ class App:
         self.free_hint_tex = self.overlay.make_text_texture([
             "WASD đi   Shift chạy   Chuột nhìn   TAB nhả chuột",
             "M menu   B Phong/Blinn   N bóng   F2 debug",
-            "G bay/đi bộ   (khi bay: E/Space lên, Q/Ctrl xuống)",
+            "SPACE nhảy   G bay/đi bộ   (khi bay: E/Space lên, Q/Ctrl xuống)",
         ], title=False, font_size=20, pad=14)
         self.fly_tex = self.overlay.make_text_texture([
             "CHẾ ĐỘ BAY   G để hạ cánh   E/Space lên   Q/Ctrl xuống",
@@ -92,6 +93,8 @@ class App:
         """Update application state and input capture consistently."""
         old_mode = self.mode
         self.mode = new_mode
+        if new_mode != Mode.FREE:
+            self.jump_velocity = 0.0
         if new_mode != Mode.FREE or old_mode == Mode.MENU:
             self.camera.fly_mode = False
 
@@ -124,6 +127,7 @@ class App:
     def _toggle_fly(self):
         cam = self.camera
         if not cam.fly_mode:
+            self.jump_velocity = 0.0
             cam.fly_mode = True
             return
         # Landing: only if the whole column down to the ground is free (not on a roof / inside a wall).
@@ -144,6 +148,7 @@ class App:
             self._notify("Không thể hạ cánh ở đây (có vật cản) - bay sang chỗ khác")
 
     def _respawn(self):
+        self.jump_velocity = 0.0
         self.camera.position[:] = self.SPAWN_POS
         self.camera.yaw, self.camera.pitch = self.SPAWN_YAW, 0.0
         self.camera._update_vectors()
@@ -202,6 +207,10 @@ class App:
                 self._set_mouse_capture(not self.mouse_captured)
             elif key == pygame.K_g:
                 self._toggle_fly()
+            elif key == pygame.K_SPACE and not self.camera.fly_mode:
+                target = self._ground_at(self.camera.position[0], self.camera.position[2]) + config.EYE_HEIGHT
+                if self.jump_velocity == 0.0 and self.camera.position[1] <= target + 0.08:
+                    self.jump_velocity = config.JUMP_SPEED
 
         if key == pygame.K_b:
             self.use_blinn = not self.use_blinn
@@ -228,11 +237,21 @@ class App:
                 self.camera.position[1] = min(max(self.camera.position[1], ground + config.FLY_MIN_CLEARANCE),
                                               config.FLY_MAX_HEIGHT)
             else:
-                # Keep the camera at eye height above the current walking surface.
-                height_at = getattr(self.scene, "height_at", None)
-                ground = height_at(float(self.camera.position[0]), float(self.camera.position[2])) if height_at else 0.0
+                ground = self._ground_at(self.camera.position[0], self.camera.position[2])
                 target = ground + config.EYE_HEIGHT
-                self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
+                if self.jump_velocity != 0.0 or self.camera.position[1] > target + 0.01:
+                    self.jump_velocity -= config.GRAVITY * dt
+                    old_y = float(self.camera.position[1])
+                    delta_y = self.jump_velocity * dt
+                    self.camera.position = self.collision.move(
+                        self.camera.position, np.array([0.0, delta_y, 0.0], dtype=np.float32))
+                    if delta_y > 0.0 and self.camera.position[1] < old_y + delta_y - 1e-4:
+                        self.jump_velocity = 0.0
+                    if self.camera.position[1] <= target:
+                        self.camera.position[1] = target
+                        self.jump_velocity = 0.0
+                else:
+                    self.camera.position[1] += (target - self.camera.position[1]) * min(1.0, 14.0 * dt)
 
         elif self.mode == Mode.TOUR:
             pygame.mouse.get_rel()
